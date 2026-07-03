@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraScribe Pro - Offline AI Voice Transcriber & Summarizer</title>
+    <meta name="description" content="Secure, offline, and free local voice transcription and summarization. SaaS-style desktop interface.">
+    <!-- Fonts: Inter for clean typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for professional icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css?v=2.0">
+</head>
+<body class="light-theme">
+    <div class="app-container">
+        <!-- Sidebar for History (Fixed Left) -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fa-solid fa-microphone-lines logo-icon"></i>
+                    <span class="logo-text">AuraScribe <span class="logo-badge">Pro</span></span>
+                </div>
+            </div>
+            
+            <!-- AI Engine & Cost Status Card -->
+            <div class="sidebar-status-card">
+                <div class="status-indicator">
+                    <span class="pulse-dot green"></span>
+                    <span class="status-text">Local AI Engine: Online</span>
+                </div>
+                <div class="cost-indicator">
+                    <i class="fa-solid fa-circle-dollar-to-slot"></i>
+                    <span>$0.00 Offline</span>
+                </div>
+            </div>
+
+            <!-- Refresh Drawer Section -->
+            <div class="history-actions-row">
+                <span class="history-title">Session History</span>
+                <button id="refresh-sessions-btn" title="Refresh history" class="sidebar-action-btn">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
+            </div>
+
+            <!-- Searchable Recording History -->
+            <div class="sidebar-search-container">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="history-search" placeholder="Search sessions..." class="sidebar-search-input">
+            </div>
+
+            <div class="sessions-list-container">
+                <div class="sessions-list" id="sessions-list">
+                    <div class="loading-placeholder">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <p>Loading history...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div class="footer-info">Offline Transcriber v1.2</div>
+                <div class="footer-path" title="D:\Voice transcriber">Saves locally to Workspace</div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-left">
+                    <button class="menu-toggle" id="menu-toggle" title="Toggle history sidebar">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <h1 class="header-title">Audio Transcription Workspace</h1>
+                </div>
+                <div class="header-right">
+                    <div class="offline-badge">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span>100% Offline Secured</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Large Recording Dashboard Card -->
+            <section class="dashboard-card card">
+                <div class="dashboard-grid">
+                    <!-- Column 1: Recording Controls -->
+                    <div class="dashboard-column controls-column">
+                        <h4 class="column-title"><i class="fa-solid fa-circle-play"></i> Session Controls</h4>
+                        <div class="record-controls-container">
+                            <button id="record-btn" class="ctrl-btn-record" title="Start Recording">
+                                <i class="fa-solid fa-microphone"></i>
+                            </button>
+                            <div class="record-btn-sub-label">Record</div>
+                        </div>
+                        <div class="action-buttons-row">
+                            <button id="pause-btn" class="ctrl-btn ctrl-btn-pause" disabled>
+                                <i class="fa-solid fa-pause"></i> <span>Pause</span>
+                            </button>
+                            <button id="stop-btn" class="ctrl-btn ctrl-btn-stop" disabled>
+                                <i class="fa-solid fa-square"></i> <span>Stop & Save</span>
+                            </button>
+                        </div>
+                        <div class="timer-display-container">
+                            <span class="timer-icon"><i class="fa-regular fa-clock"></i></span>
+                            <span class="timer-digits" id="recording-timer">00:00</span>
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Waveform Visualizer & Live Status -->
+                    <div class="dashboard-column visualizer-column">
+                        <div class="visualizer-header">
+                            <div class="status-label-group">
+                                <span class="status-indicator-dot" id="status-indicator-dot"></span>
+                                <span class="status-label-text" id="status-label">Ready to record</span>
+                            </div>
+                            <span class="autosave-tag" id="autosave-tag">
+                                <i class="fa-solid fa-cloud-arrow-up"></i> Autosave active
+                            </span>
+                        </div>
+                        <div class="waveform-canvas-wrapper">
+                            <canvas id="waveform-canvas"></canvas>
+                        </div>
+                        <div class="visualizer-subtext">Animated live waveform visualization</div>
+                    </div>
+
+                    <!-- Column 3: Engine Settings -->
+                    <div class="dashboard-column settings-column">
+                        <h4 class="column-title"><i class="fa-solid fa-sliders"></i> Engine Configurations</h4>
+                        
+                        <div class="setting-field">
+                            <div class="setting-label-row">
+                                <label for="model-select">Whisper Model</label>
+                                <span class="setting-helper-tip" title="Larger models are more accurate but consume more RAM.">Info</span>
+                            </div>
+                            <select id="model-select" class="form-select">
+                                <option value="tiny">Tiny (Fastest, ~75MB)</option>
+                                <option value="base" selected>Base (Recommended, ~140MB)</option>
+                                <option value="small">Small (High Accuracy, ~460MB)</option>
+                                <option value="medium">Medium (Very High Accuracy, ~1.5GB)</option>
+                                <option value="large-v3">Large V3 (Maximum Accuracy, ~3GB)</option>
+                            </select>
+                            <p class="setting-help-text">Local translation and transcription model.</p>
+                        </div>
+
+                        <div class="setting-field">
+                            <div class="setting-label-row">
+                                <label for="language-select">Audio Language</label>
+                            </div>
+                            <select id="language-select" class="form-select">
+                                <option value="auto" selected>Auto-Detect Language</option>
+                                <option value="ur">Urdu (اردو)</option>
+                                <option value="hi">Hindi (हिन्दी)</option>
+                                <option value="en">English</option>
+                                <option value="es">Spanish (Español)</option>
+                                <option value="fr">French (Français)</option>
+                                <option value="de">German (Deutsch)</option>
+                                <option value="zh">Chinese (中文)</option>
+                                <option value="ar">Arabic (العربية)</option>
+                            </select>
+                            <p class="setting-help-text">Forces transcription language if set.</p>
+                        </div>
+
+                        <div class="setting-field toggle-field">
+                            <div class="toggle-control">
+                                <input type="checkbox" id="continuous-autosave" checked class="switch-input">
+                                <label for="continuous-autosave" class="switch-label">Continuous Autosave (15s)</label>
+                            </div>
+                            <p class="setting-help-text">Saves document drafts to disk automatically.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Responsive Two-Column Results Section -->
+            <section class="results-grid-container">
+                <!-- Left Card: Full Transcription (65% width) -->
+                <article class="results-card card transcription-card" id="transcription-container">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fa-solid fa-align-left text-blue-600"></i>
+                            <h2 class="card-header-title">Full Transcription</h2>
+                        </div>
+                        <div class="card-actions-toolbar">
+                            <!-- Inner search bar (expanded on toggle or clean inline) -->
+                            <div class="transcription-search-wrapper" id="transcription-search-wrapper">
+                                <i class="fa-solid fa-magnifying-glass inline-search-icon"></i>
+                                <input type="text" id="transcription-search" placeholder="Search text..." class="transcription-search-input">
+                            </div>
+                            
+                            <button id="copy-text-btn" class="toolbar-btn" title="Copy text to clipboard">
+                                <i class="fa-regular fa-copy"></i> <span>Copy</span>
+                            </button>
+                            <button id="download-docx-btn" class="toolbar-btn" title="Save Word Document" disabled>
+                                <i class="fa-regular fa-file-word text-blue-600"></i> <span>Save Word</span>
+                            </button>
+                            <button id="clear-text-btn" class="toolbar-btn text-red-600" title="Clear transcription text">
+                                <i class="fa-regular fa-trash-can"></i> <span>Clear</span>
+                            </button>
+                            <div class="export-dropdown-container">
+                                <button id="export-btn" class="toolbar-btn" title="Export options">
+                                    <i class="fa-solid fa-file-export"></i> <span>Export</span>
+                                </button>
+                                <div class="export-menu" id="export-menu">
+                                    <button class="export-item" id="export-txt"><i class="fa-regular fa-file-lines"></i> Plain Text (.txt)</button>
+                                    <button class="export-item" id="export-docx"><i class="fa-regular fa-file-word"></i> Word Doc (.docx)</button>
+                                    <button class="export-item" id="export-pdf"><i class="fa-regular fa-file-pdf"></i> PDF Summary (.pdf)</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Scrollable Transcription Body -->
+                    <div class="transcription-body scrollable-y" id="transcription-body">
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="fa-solid fa-microphone-slash"></i></div>
+                            <h3>No transcription yet</h3>
+                            <p>Transcription segments with timestamps will show here as you record.</p>
+                        </div>
+                    </div>
+
+                    <!-- Autosave Footer Status Bar -->
+                    <div class="autosave-footer-indicator" id="autosave-indicator">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span id="autosave-indicator-text">All changes autosaved locally</span>
+                    </div>
+                </article>
+
+                <!-- Right Card: AI Summary & Key Points (35% width) -->
+                <article class="results-card card summary-card" id="summary-container">
+                    <div class="card-header">
+                        <div class="card-header-left">
+                            <i class="fa-solid fa-wand-magic-sparkles text-purple-600"></i>
+                            <h2 class="card-header-title">AI Summary & Key Points</h2>
+                        </div>
+                        <div class="card-actions-toolbar">
+                            <button id="download-pdf-btn" class="toolbar-btn" title="Download PDF Summary" disabled>
+                                <i class="fa-regular fa-file-pdf text-red-600"></i> <span>Save PDF</span>
+                            </button>
+                            <button id="copy-summary-btn" class="toolbar-btn" title="Copy Summary Text">
+                                <i class="fa-regular fa-copy"></i> <span>Copy</span>
+                            </button>
+                            <button id="regenerate-summary-btn" class="toolbar-btn" title="Regenerate summary from active transcription">
+                                <i class="fa-solid fa-rotate"></i> <span>Regenerate</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scrollable Summary Body -->
+                    <div class="summary-body scrollable-y" id="summary-body">
+                        <!-- Key categories formatted dynamically -->
+                        <div class="empty-state">
+                            <div class="empty-state-icon text-purple-600"><i class="fa-solid fa-sparkles"></i></div>
+                            <h3>AI Summary Panel</h3>
+                            <p>Key points, action items, important decisions, and highlights will populate once you stop recording or load history.</p>
+                        </div>
+                    </div>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <!-- Script Entry -->
+    <script src="script.js?v=2.0"></script>
+</body>
+</html>

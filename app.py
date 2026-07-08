@@ -44,11 +44,15 @@ def load_env():
             logger.warning(f"Failed to load .env file: {e}")
 
 load_env()
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
+# Import API keys from local config (not committed to git)
+try:
+    from config import GROQ_API_KEY, NOVA_API_KEY
+except ImportError:
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+    NOVA_API_KEY = os.environ.get("NOVA_API_KEY", "sk-nova-998877")
 KIMI_AVAILABLE = True
 
 # Nova Dynamics API Configuration
-NOVA_API_KEY = "sk-nova-998877"
 NOVA_API_URL = "https://britsyncuk--ollama-gpu-bench-run.modal.run/api/generate"
 nova_warm = False  # Track if Nova is warmed up
 

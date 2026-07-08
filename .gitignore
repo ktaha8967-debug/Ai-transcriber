@@ -23,4 +23,5 @@ transcriptions/
 .env.local
 .env.production
 error.txt
+config.py
 *.txt

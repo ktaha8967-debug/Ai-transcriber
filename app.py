@@ -321,7 +321,7 @@ async def transcribe_audio(
     model_used = "unknown"
     
     try:
-        with open(temp_dir, "wb") as buffer:
+        with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
         file_size = os.path.getsize(temp_file_path)

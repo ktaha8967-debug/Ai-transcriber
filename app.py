@@ -5,14 +5,12 @@ import logging
 import threading
 from typing import List, Optional, Any
 from datetime import datetime
-import httpx
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from faster_whisper import WhisperModel
 import json as json_module
-import queue
 
 # Try importing vosk for fast local transcription
 VOSK_AVAILABLE = False
@@ -30,32 +28,6 @@ import document_generator
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# Load .env file manually
-def load_env():
-    if os.path.exists(".env"):
-        try:
-            with open(".env", "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        key, val = line.split("=", 1)
-                        os.environ[key.strip()] = val.strip().strip('"').strip("'")
-        except Exception as e:
-            logger.warning(f"Failed to load .env file: {e}")
-
-load_env()
-# Import API keys from local config (not committed to git)
-try:
-    from config import GROQ_API_KEY, NOVA_API_KEY
-except ImportError:
-    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-    NOVA_API_KEY = os.environ.get("NOVA_API_KEY", "sk-nova-998877")
-KIMI_AVAILABLE = True
-
-# Nova Dynamics API Configuration
-NOVA_API_URL = "https://britsyncuk--ollama-gpu-bench-run.modal.run/api/generate"
-nova_warm = False  # Track if Nova is warmed up
-
 app = FastAPI(title="Voice Transcriber & Summarizer")
 
 # Session structure to hold in-memory drafts
@@ -71,33 +43,29 @@ class SaveRequest(BaseModel):
 class ModelPool:
     """
     Manages multiple transcription models and distributes work in round-robin fashion.
-    When one model is busy transcribing a 3-second batch, the next batch goes to the next available model.
     """
     
     def __init__(self):
-        self.models = {}  # model_name -> model_instance
-        self.model_locks = {}  # model_name -> threading.Lock
+        self.models = {}
+        self.model_locks = {}
         self.round_robin_index = 0
         self.lock = threading.Lock()
-        self.model_order = []  # Ordered list of available model names
+        self.model_order = []
         self.ready = False
         
     def register_vosk_model(self, name: str, model: Any):
-        """Register a Vosk model in the pool."""
         self.models[name] = model
         self.model_locks[name] = threading.Lock()
         self.model_order.append(name)
         logger.info(f"Registered Vosk model: {name}")
         
     def register_whisper_model(self, name: str, model: Any):
-        """Register a Whisper model in the pool."""
         self.models[name] = model
         self.model_locks[name] = threading.Lock()
         self.model_order.append(name)
         logger.info(f"Registered Whisper model: {name}")
         
     def get_next_model(self) -> str:
-        """Get the next model name in round-robin fashion."""
         with self.lock:
             if not self.model_order:
                 return None
@@ -106,17 +74,12 @@ class ModelPool:
             return model_name
             
     def transcribe(self, file_path: str, language: str = "auto") -> tuple:
-        """
-        Transcribe audio using the next available model in round-robin.
-        Returns (segments, detected_language, model_used)
-        """
         model_name = self.get_next_model()
         if not model_name:
             raise Exception("No models available in pool")
             
         logger.info(f"Assigning batch to model: {model_name}")
         
-        # Acquire lock for this specific model (thread-safe)
         with self.model_locks[model_name]:
             try:
                 if model_name.startswith("vosk-"):
@@ -128,11 +91,10 @@ class ModelPool:
                     
                 return segments, lang, model_name
             except Exception as e:
-                logger.error(f"Model {model_name} transcription failed: {e}")
+                logger.error(f"Model {model_name} failed: {e}")
                 raise
                 
     def _transcribe_vosk(self, file_path: str, model_name: str, language: str) -> tuple:
-        """Transcribe using a Vosk model."""
         model = self.models[model_name]
         
         wf = wave.open(file_path, "rb")
@@ -163,7 +125,6 @@ class ModelPool:
         if not results:
             return [], language
             
-        # Group words into segments
         segments = []
         current_words = []
         current_start = results[0]["start"]
@@ -189,12 +150,10 @@ class ModelPool:
                 "text": text.strip()
             })
             
-        # Extract language from model name
         lang = model_name.replace("vosk-small-", "")
         return segments, lang
         
     def _transcribe_whisper(self, file_path: str, model_name: str, language: str) -> tuple:
-        """Transcribe using a Whisper model."""
         model = self.models[model_name]
         
         transcribe_args = {
@@ -218,7 +177,6 @@ class ModelPool:
         return segments, info.language
         
     def get_status(self) -> dict:
-        """Get pool status for debugging."""
         return {
             "total_models": len(self.model_order),
             "models": self.model_order,
@@ -229,7 +187,7 @@ class ModelPool:
 model_pool = ModelPool()
 
 # ============================================================================
-# MODEL DOWNLOAD AND REGISTRATION
+# VOSK MODEL DOWNLOAD AND REGISTRATION
 # ============================================================================
 
 VOSK_MODEL_URLS = {
@@ -244,7 +202,6 @@ VOSK_MODEL_URLS = {
 }
 
 def download_vosk_model(lang_key: str) -> str:
-    """Downloads and extracts a Vosk model if not already present."""
     import zipfile
     import urllib.request
     
@@ -266,259 +223,45 @@ def download_vosk_model(lang_key: str) -> str:
         zip_ref.extractall("vosk_models")
     os.remove(zip_path)
     
-    logger.info(f"Vosk model {lang_key} downloaded successfully.")
+    logger.info(f"Vosk model {lang_key} downloaded.")
     return model_dir
 
 def init_models_background():
-    """Initialize all models in background threads for faster startup."""
     import concurrent.futures
     
     def load_vosk_model(lang_key):
-        """Load a single Vosk model."""
         try:
             model_path = download_vosk_model(lang_key)
             model = VoskModel(model_path)
             model_pool.register_vosk_model(lang_key, model)
-            logger.info(f"Vosk model {lang_key} ready!")
+            logger.info(f"Vosk {lang_key} ready!")
         except Exception as e:
-            logger.error(f"Failed to load Vosk model {lang_key}: {e}")
+            logger.error(f"Failed to load Vosk {lang_key}: {e}")
             
     def load_whisper_model(size):
-        """Load a single Whisper model."""
         try:
             model = WhisperModel(size, device="cpu", compute_type="int8")
             model_pool.register_whisper_model(f"whisper-{size}", model)
-            logger.info(f"Whisper model {size} ready!")
+            logger.info(f"Whisper {size} ready!")
         except Exception as e:
-            logger.error(f"Failed to load Whisper model {size}: {e}")
+            logger.error(f"Failed to load Whisper {size}: {e}")
             
-    # Load all models in parallel using thread pool
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
         futures = []
         
-        # Submit Vosk models (8 models)
         for lang_key in VOSK_MODEL_URLS.keys():
             futures.append(executor.submit(load_vosk_model, lang_key))
             
-        # Submit Whisper models (3 fast models)
         for size in ["tiny", "base", "small"]:
             futures.append(executor.submit(load_whisper_model, size))
             
-        # Wait for all to complete
         concurrent.futures.wait(futures)
         
     model_pool.ready = True
-    logger.info(f"All models loaded! Pool has {len(model_pool.model_order)} models ready.")
+    logger.info(f"All models loaded! Pool has {len(model_pool.model_order)} models.")
 
 # ============================================================================
-# CLOUD API TRANSCRIPTION FUNCTIONS
-# ============================================================================
-
-def transcribe_via_nova(file_path: str, language: str = "auto"):
-    """
-    Calls Nova Dynamics GPU API for text processing.
-    NOTE: This is a TEXT chat API (qwen2.5:32b), not a speech-to-text API.
-    Used for post-processing and text enhancement.
-    """
-    global nova_warm
-    
-    # Only use if warmed up
-    if not nova_warm:
-        raise Exception("Nova not warmed up")
-    
-    # Read audio file info for context
-    import os
-    file_size = os.path.getsize(file_path)
-    
-    # Prepare prompt - ask Nova to help with transcription context
-    lang_instruction = ""
-    if language != "auto":
-        lang_map = {"en": "English", "hi": "Hindi", "ur": "Urdu", "es": "Spanish", 
-                    "fr": "French", "de": "German", "zh": "Chinese", "ar": "Arabic"}
-        lang_instruction = f"Language: {lang_map.get(language, language)}."
-    
-    prompt = f"You are a transcription assistant. Audio file received ({file_size} bytes). {lang_instruction} Ready to process."
-    
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {NOVA_API_KEY}"
-    }
-    
-    payload = {
-        "model": "qwen2.5:32b",
-        "prompt": prompt,
-        "stream": False
-    }
-    
-    try:
-        # Quick timeout - 8 seconds max
-        with httpx.Client(timeout=8.0) as client:
-            response = client.post(NOVA_API_URL, headers=headers, json=payload)
-            
-            if response.status_code != 200:
-                raise Exception(f"Nova API error: {response.status_code} {response.text}")
-            
-            resp_data = response.json()
-            ai_response = resp_data.get("response", "")
-            
-            if ai_response:
-                # Nova is working - return acknowledgement
-                return [{"start": 0.0, "end": 1.0, "text": f"[Nova GPU Ready] {ai_response[:100]}"}], "en"
-            else:
-                raise Exception("Empty response from Nova")
-            
-    except httpx.TimeoutException:
-        logger.warning("Nova Dynamics timed out (cold start)")
-        raise Exception("Nova timeout - cold start")
-    except Exception as e:
-        logger.warning(f"Nova Dynamics failed: {e}")
-        raise
-
-def warm_nova_api():
-    """Warm up Nova Dynamics GPU in background on startup."""
-    global nova_warm
-    
-    def _warm():
-        global nova_warm
-        max_retries = 3
-        
-        for attempt in range(max_retries):
-            try:
-                logger.info(f"Warming up Nova Dynamics GPU (attempt {attempt + 1})...")
-                headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {NOVA_API_KEY}"
-                }
-                payload = {
-                    "model": "qwen2.5:32b",
-                    "prompt": "Hello, respond with just 'OK'",
-                    "stream": False
-                }
-                
-                with httpx.Client(timeout=30.0) as client:
-                    response = client.post(NOVA_API_URL, headers=headers, json=payload)
-                    
-                    if response.status_code == 200:
-                        resp_data = response.json()
-                        if resp_data.get("response"):
-                            nova_warm = True
-                            logger.info("Nova Dynamics GPU is WARM and READY!")
-                            return
-                    else:
-                        logger.warning(f"Nova warm-up attempt {attempt + 1} failed: {response.status_code}")
-                        
-            except Exception as e:
-                logger.warning(f"Nova warm-up attempt {attempt + 1} error: {e}")
-            
-            # Wait before retry
-            import time
-            time.sleep(2)
-        
-        logger.warning("Nova Dynamics warm-up failed after all attempts - will use other models")
-    
-    threading.Thread(target=_warm, daemon=True).start()
-
-def transcribe_via_groq(file_path: str, api_key: str, language: str = "auto"):
-    """
-    Transcribes audio using Groq Whisper API (Cloud-based, fast & accurate).
-    Uses whisper-large-v3-turbo for best speed/accuracy balance.
-    """
-    url = "https://api.groq.com/openai/v1/audio/transcriptions"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    
-    # Read file for sending
-    with open(file_path, "rb") as f:
-        file_data = f.read()
-    
-    files = {"file": (os.path.basename(file_path), file_data, "audio/wav")}
-    data = {"model": "whisper-large-v3-turbo", "response_format": "verbose_json"}
-    
-    if language and language != "auto":
-        data["language"] = language
-    
-    logger.info(f"Groq request: file={os.path.basename(file_path)}, size={len(file_data)} bytes")
-    
-    try:
-        with httpx.Client(timeout=30.0) as client:
-            response = client.post(url, headers=headers, files=files, data=data)
-            
-            logger.info(f"Groq response: status={response.status_code}")
-            
-            if response.status_code != 200:
-                error_msg = f"Groq API error {response.status_code}: {response.text[:200]}"
-                logger.error(error_msg)
-                raise Exception(error_msg)
-            
-            resp_data = response.json()
-            segments = resp_data.get("segments", [])
-            detected_language = resp_data.get("language", "auto")
-            full_text = resp_data.get("text", "")
-            
-            logger.info(f"Groq result: text='{full_text[:100]}', segments={len(segments)}, lang={detected_language}")
-            
-            parsed_segments = []
-            for seg in segments:
-                parsed_segments.append({
-                    "start": seg.get("start", 0.0),
-                    "end": seg.get("end", 0.0),
-                    "text": seg.get("text", "")
-                })
-            
-            lang_mapping = {
-                "urdu": "ur", "hindi": "hi", "english": "en", "spanish": "es",
-                "french": "fr", "german": "de", "chinese": "zh", "arabic": "ar"
-            }
-            detected_language_code = lang_mapping.get(detected_language.lower(), detected_language)
-            
-            return parsed_segments, detected_language_code
-    except httpx.TimeoutException:
-        logger.error("Groq API timeout")
-        raise
-    except Exception as e:
-        logger.error(f"Groq API exception: {e}")
-        raise
-
-def transcribe_via_gemini(file_path: str, api_key: str):
-    """Translates audio file using Google Gemini API."""
-    import base64
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    
-    with open(file_path, "rb") as f:
-        audio_data = base64.b64encode(f.read()).decode("utf-8")
-        
-    payload = {
-        "contents": [{
-            "parts": [
-                {"inlineData": {"mimeType": "audio/wav", "data": audio_data}},
-                {"text": (
-                    "Translate the spoken audio content into English. Return the result strictly as a JSON array of segment objects. "
-                    "Each object must contain three keys: 'start' (float, start time in seconds), "
-                    "'end' (float, end time in seconds), and 'text' (string, translated English text). "
-                    "Do not include any markdown formatting (like ```json), return only raw JSON."
-                )}
-            ]
-        }],
-        "generationConfig": {"responseMimeType": "application/json"}
-    }
-    
-    with httpx.Client(timeout=60.0) as client:
-        response = client.post(url, json=payload)
-        if response.status_code != 200:
-            raise Exception(f"Gemini API error: {response.text}")
-            
-        resp_data = response.json()
-        try:
-            text_content = resp_data["candidates"][0]["content"]["parts"][0]["text"]
-            import json
-            segments = json.loads(text_content)
-            if not isinstance(segments, list):
-                segments = []
-            return segments, "auto"
-        except Exception as e:
-            raise Exception(f"Failed to parse Gemini response: {e}. Raw: {response.text}")
-
-# ============================================================================
-# API ENDPOINTS
+# TRANSCRIPTION ENDPOINTS
 # ============================================================================
 
 TRANSCRIPTION_DIR = "transcriptions"
@@ -531,25 +274,31 @@ if not os.path.exists(STATIC_DIR):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize all models in background on startup."""
-    logger.info("Starting model pool initialization in background...")
+    logger.info("Starting model pool initialization...")
     threading.Thread(target=init_models_background, daemon=True).start()
-    
-    # Warm up Nova Dynamics GPU in background
-    warm_nova_api()
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/landing.html")
+
+@app.get("/app")
+async def app_redirect():
+    return RedirectResponse(url="/index.html")
+
+@app.get("/download-apk")
+async def download_apk():
+    apk_path = os.path.join(os.path.dirname(__file__), "app-debug.apk")
+    if not os.path.exists(apk_path):
+        raise HTTPException(status_code=404, detail="APK file not found")
+    return FileResponse(
+        path=apk_path,
+        filename="AuraScribe-Pro.apk",
+        media_type="application/vnd.android.package-archive"
+    )
 
 @app.get("/api/pool-status")
 async def get_pool_status():
-    """Get current model pool status."""
-    status = model_pool.get_status()
-    status["nova_warm"] = nova_warm
-    return {"success": True, "status": status}
-
-@app.post("/api/warm-nova")
-async def warm_nova_endpoint():
-    """Manually trigger Nova Dynamics warm-up."""
-    warm_nova_api()
-    return {"success": True, "message": "Nova warm-up triggered"}
+    return {"success": True, "status": model_pool.get_status()}
 
 @app.post("/api/transcribe")
 async def transcribe_audio(
@@ -557,13 +306,9 @@ async def transcribe_audio(
     language: str = Form("auto")
 ):
     """
-    Transcribes the uploaded audio file using automatic model distribution.
-    Backend picks the next available model automatically - no user selection needed.
+    Transcribes audio using automatic model distribution.
+    Uses Vosk (fast) and Whisper (accurate) models.
     """
-    load_env()
-    groq_api_key = os.environ.get("GROQ_API_KEY")
-    gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    
     temp_dir = "temp"
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
@@ -575,59 +320,25 @@ async def transcribe_audio(
     language_probability = 1.0
     model_used = "unknown"
     
-    global KIMI_AVAILABLE
-    
     try:
-        with open(temp_file_path, "wb") as buffer:
+        with open(temp_dir, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
         file_size = os.path.getsize(temp_file_path)
-        logger.info(f"Saved audio file: {temp_file_path} (Size: {file_size} bytes)")
+        logger.info(f"Received audio: {file_size} bytes")
         
-        # PRIORITY 1: Groq Cloud API (FASTEST & MOST RELIABLE)
-        if groq_api_key:
+        # Use Model Pool (Vosk + Whisper auto-distribution)
+        if model_pool.ready:
             try:
-                logger.info("Calling Groq API...")
-                segments, detected_language = transcribe_via_groq(temp_file_path, groq_api_key, language)
-                model_used = "groq-cloud"
-                logger.info(f"Groq SUCCESS! Segments: {len(segments)}, Language: {detected_language}")
-                for seg in segments[:3]:  # Log first 3 segments
-                    logger.info(f"  [{seg['start']:.1f}s-{seg['end']:.1f}s] {seg['text'][:50]}")
-            except Exception as e:
-                logger.error(f"Groq FAILED: {e}")
-        
-        # PRIORITY 2: Nova Dynamics GPU (if Groq failed)
-        if segments is None:
-            try:
-                logger.info("Trying Nova Dynamics GPU...")
-                segments, detected_language = transcribe_via_nova(temp_file_path, language)
-                model_used = "nova-dynamics-gpu"
-                logger.info("Nova Dynamics successful!")
-            except Exception as e:
-                logger.warning(f"Nova failed: {e}")
-        
-        # PRIORITY 3: Gemini API (if others failed)
-        if segments is None and gemini_api_key:
-            try:
-                logger.info("Trying Gemini Cloud API...")
-                segments, detected_language = transcribe_via_gemini(temp_file_path, gemini_api_key)
-                model_used = "gemini-cloud"
-                logger.info("Gemini transcription successful!")
-            except Exception as e:
-                logger.warning(f"Gemini failed: {e}")
-        
-        # PRIORITY 4: Model Pool (Vosk + Whisper auto-distribution)
-        if segments is None and model_pool.ready:
-            try:
-                logger.info("Using Model Pool (auto-distribution)...")
+                logger.info("Using Model Pool...")
                 segments, detected_language, model_used = model_pool.transcribe(temp_file_path, language)
-                logger.info(f"Model Pool successful! Used: {model_used}")
+                logger.info(f"Success! Model: {model_used}, Segments: {len(segments)}")
             except Exception as e:
                 logger.warning(f"Model Pool failed: {e}")
-                
-        # PRIORITY 5: Basic Whisper fallback (last resort)
+        
+        # Fallback: Basic Whisper
         if segments is None:
-            logger.info("Fallback: Loading Whisper tiny model...")
+            logger.info("Fallback: Loading Whisper tiny...")
             try:
                 model = WhisperModel("tiny", device="cpu", compute_type="int8")
                 transcribe_args = {"beam_size": 1, "vad_filter": True, "task": "translate"}
@@ -640,11 +351,10 @@ async def transcribe_audio(
                 language_probability = info.language_probability
                 model_used = "whisper-tiny-fallback"
             except Exception as e:
-                logger.error(f"All transcription methods failed: {e}")
-                # Return error instead of dummy data
+                logger.error(f"All methods failed: {e}")
                 return JSONResponse(
                     status_code=500,
-                    content={"success": False, "error": "All transcription models failed. Please try again."}
+                    content={"success": False, "error": "All transcription models failed."}
                 )
         
         # Format segments
@@ -669,7 +379,7 @@ async def transcribe_audio(
             })
             full_text_list.append(text_val)
             
-        logger.info(f"Transcription completed. Model: {model_used}, Language: {detected_language}")
+        logger.info(f"Transcription complete. Model: {model_used}, Language: {detected_language}")
         
         return {
             "success": True,
@@ -681,7 +391,7 @@ async def transcribe_audio(
         }
         
     except Exception as e:
-        logger.error(f"Error during transcription: {e}")
+        logger.error(f"Error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "error": str(e)}
@@ -692,7 +402,6 @@ async def transcribe_audio(
 
 @app.post("/api/save")
 async def save_transcription(request: SaveRequest):
-    """Saves the transcription to Word (.docx) and generates a PDF with summaries."""
     try:
         session_id = request.session_id
         text_segments = request.text_segments
@@ -706,7 +415,7 @@ async def save_transcription(request: SaveRequest):
         else:
             summary_points = ["Audio transcription was too short to generate a summary."]
             
-        logger.info(f"Saving transcription for session: {session_id}...")
+        logger.info(f"Saving session: {session_id}...")
         
         docx_path = document_generator.save_to_docx(session_id, text_segments, summary_points)
         pdf_path = document_generator.save_to_pdf(session_id, summary_points, full_text)
@@ -731,7 +440,7 @@ async def save_transcription(request: SaveRequest):
             "summary_points": summary_points
         }
     except Exception as e:
-        logger.error(f"Error saving files: {e}")
+        logger.error(f"Save error: {e}")
         return JSONResponse(
             status_code=500,
             content={"success": False, "error": str(e)}
@@ -739,7 +448,6 @@ async def save_transcription(request: SaveRequest):
 
 @app.get("/api/sessions")
 async def get_sessions():
-    """Lists all previous saved sessions."""
     try:
         files = os.listdir(TRANSCRIPTION_DIR)
         sessions = []
@@ -780,7 +488,6 @@ async def get_sessions():
 
 @app.get("/api/download/{file_type}/{session_id}")
 async def download_file(file_type: str, session_id: str):
-    """Downloads the requested document."""
     if file_type == "docx":
         filename = f"{session_id}.docx"
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -788,37 +495,13 @@ async def download_file(file_type: str, session_id: str):
         filename = f"{session_id}_summary.pdf"
         media_type = "application/pdf"
     else:
-        raise HTTPException(status_code=400, detail="Invalid file type. Use 'docx' or 'pdf'.")
+        raise HTTPException(status_code=400, detail="Invalid file type.")
         
     file_path = os.path.join(TRANSCRIPTION_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail=f"File {filename} not found.")
         
     return FileResponse(path=file_path, filename=filename, media_type=media_type)
-
-@app.get("/")
-async def root():
-    """Redirect root to landing page."""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/landing.html")
-
-@app.get("/app")
-async def app_redirect():
-    """Redirect /app to main transcription workspace."""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/index.html")
-
-@app.get("/download-apk")
-async def download_apk():
-    """Download the Android APK file."""
-    apk_path = os.path.join(os.path.dirname(__file__), "app-debug.apk")
-    if not os.path.exists(apk_path):
-        raise HTTPException(status_code=404, detail="APK file not found")
-    return FileResponse(
-        path=apk_path,
-        filename="AuraScribe-Pro.apk",
-        media_type="application/vnd.android.package-archive"
-    )
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 

@@ -32,10 +32,8 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ProgressBar progressBar;
 
-    // Server URL - change this to your server address
-    // For local server: http://10.0.2.2:8000 (Android emulator)
-    // For real device: http://YOUR_PC_IP:8000
-    private static final String SERVER_URL = "http://10.0.2.2:8000";
+    // Server URL - Live website (auto-fetches all changes, no rebuild needed!)
+    private static final String SERVER_URL = "https://ai-transcriber.britsync.co.uk";
 
     private static final int PERMISSION_REQUEST_CODE = 100;
     private static final int FILE_CHOOSER_REQUEST_CODE = 101;

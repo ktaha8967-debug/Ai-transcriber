@@ -47,6 +47,10 @@ load_env()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 KIMI_AVAILABLE = True
 
+# Nova Dynamics API Configuration
+NOVA_API_KEY = "sk-nova-998877"
+NOVA_API_URL = "https://britsyncuk--ollama-gpu-bench-run.modal.run/api/generate"
+
 app = FastAPI(title="Voice Transcriber & Summarizer")
 
 # Session structure to hold in-memory drafts
@@ -305,6 +309,72 @@ def init_models_background():
 # CLOUD API TRANSCRIPTION FUNCTIONS
 # ============================================================================
 
+def transcribe_via_nova(file_path: str, language: str = "auto"):
+    """
+    Transcribes audio using Nova Dynamics GPU API (qwen2.5:32b).
+    This is the PRIMARY model - tried first before all others.
+    """
+    import base64
+    
+    # Read audio file and encode to base64
+    with open(file_path, "rb") as f:
+        audio_data = base64.b64encode(f.read()).decode("utf-8")
+    
+    # Prepare prompt for transcription
+    lang_instruction = ""
+    if language != "auto":
+        lang_map = {"en": "English", "hi": "Hindi", "ur": "Urdu", "es": "Spanish", 
+                    "fr": "French", "de": "German", "zh": "Chinese", "ar": "Arabic"}
+        lang_instruction = f"Transcribe in {lang_map.get(language, language)}."
+    
+    prompt = f"""You are a professional audio transcription AI. Transcribe the following audio accurately.
+
+{lang_instruction}
+
+Return the transcription as a JSON array with segments. Each segment must have:
+- "start": float (start time in seconds)
+- "end": float (end time in seconds)  
+- "text": string (transcribed text)
+
+Return ONLY the JSON array, no other text.
+
+Audio data (base64): {audio_data[:1000]}..."""
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {NOVA_API_KEY}"
+    }
+    
+    payload = {
+        "model": "qwen2.5:32b",
+        "prompt": prompt,
+        "stream": False
+    }
+    
+    try:
+        with httpx.Client(timeout=120.0) as client:
+            response = client.post(NOVA_API_URL, headers=headers, json=payload)
+            if response.status_code != 200:
+                raise Exception(f"Nova Dynamics API error: {response.text}")
+            
+            resp_data = response.json()
+            ai_response = resp_data.get("response", "")
+            
+            # Try to parse JSON from response
+            import re
+            json_match = re.search(r'\[.*\]', ai_response, re.DOTALL)
+            if json_match:
+                segments = json.loads_module.loads(json_match.group())
+                if isinstance(segments, list) and len(segments) > 0:
+                    return segments, language if language != "auto" else "en"
+            
+            # If no JSON found, return the text as a single segment
+            return [{"start": 0.0, "end": 3.0, "text": ai_response.strip()}], "en"
+            
+    except Exception as e:
+        logger.warning(f"Nova Dynamics API failed: {e}")
+        raise
+
 def transcribe_via_groq(file_path: str, api_key: str, language: str = "auto"):
     """Translates audio file using Groq Whisper API."""
     url = "https://api.groq.com/openai/v1/audio/translations"
@@ -436,8 +506,17 @@ async def transcribe_audio(
             
         logger.info(f"Saved temporary file to {temp_file_path}")
         
-        # PRIORITY 1: Try cloud APIs if available (fastest)
-        if groq_api_key:
+        # PRIORITY 1: Nova Dynamics GPU API (PRIMARY MODEL - tried first!)
+        try:
+            logger.info("Trying Nova Dynamics GPU API (PRIMARY)...")
+            segments, detected_language = transcribe_via_nova(temp_file_path, language)
+            model_used = "nova-dynamics-gpu"
+            logger.info("Nova Dynamics transcription successful!")
+        except Exception as e:
+            logger.warning(f"Nova Dynamics failed: {e}. Trying other models...")
+        
+        # PRIORITY 2: Try other cloud APIs if Nova failed
+        if segments is None and groq_api_key:
             try:
                 logger.info("Trying Groq Cloud API...")
                 segments, detected_language = transcribe_via_groq(temp_file_path, groq_api_key, language)

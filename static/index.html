@@ -61,8 +61,24 @@
             </div>
             
             <div class="sidebar-footer">
+                <div id="user-info" style="display: none; margin-bottom: 10px; padding: 10px; background: rgba(108,99,255,0.1); border-radius: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #6C63FF, #FF6B9D); border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                            <i class="fa-solid fa-user" style="font-size: 14px;"></i>
+                        </div>
+                        <div>
+                            <div id="user-name" style="font-size: 13px; font-weight: 600;"></div>
+                            <div id="user-email" style="font-size: 11px; opacity: 0.7;"></div>
+                        </div>
+                    </div>
+                    <button onclick="logout()" style="width: 100%; margin-top: 8px; padding: 6px; background: rgba(255,107,107,0.2); border: none; border-radius: 6px; color: #FF6B6B; font-size: 11px; cursor: pointer;">Sign Out</button>
+                </div>
+                <div id="guest-info">
+                    <a href="login.html" style="display: block; text-align: center; padding: 10px; background: linear-gradient(135deg, #6C63FF, #8B83FF); border-radius: 8px; color: white; text-decoration: none; font-size: 13px; font-weight: 600;">
+                        <i class="fa-solid fa-right-to-bracket"></i> Sign In / Sign Up
+                    </a>
+                </div>
                 <div class="footer-info">Offline Transcriber v1.3</div>
-                <div class="footer-path" title="D:\Voice transcriber">Saves locally to Workspace</div>
             </div>
         </aside>
 

@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraScribe Pro - Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --primary-light: #8B83FF;
+            --secondary: #FF6B9D;
+            --accent: #00D4AA;
+            --bg-dark: #0F0F1A;
+            --bg-card: rgba(255, 255, 255, 0.06);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --success: #00D4AA;
+            --error: #FF6B6B;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0F0F1A 0%, #1A1A2E 50%, #16213E 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-primary);
+            padding: 20px;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 440px;
+            position: relative;
+        }
+
+        .auth-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 48px 40px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        .auth-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .auth-logo-icon {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 8px 24px rgba(108, 99, 255, 0.4);
+        }
+
+        .auth-logo-text {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .auth-title {
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .auth-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-input-wrapper {
+            position: relative;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            padding-left: 44px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            font-size: 15px;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .form-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+            transition: color 0.3s ease;
+        }
+
+        .password-toggle:hover {
+            color: var(--primary-light);
+        }
+
+        .password-strength {
+            margin-top: 8px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .password-strength-bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .password-strength-bar.weak { width: 33%; background: var(--error); }
+        .password-strength-bar.medium { width: 66%; background: #FFB347; }
+        .password-strength-bar.strong { width: 100%; background: var(--success); }
+
+        .password-requirements {
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .password-requirements span {
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .password-requirements span.valid {
+            color: var(--success);
+        }
+
+        .email-status {
+            margin-top: 6px;
+            font-size: 12px;
+            display: none;
+        }
+
+        .email-status.valid { display: block; color: var(--success); }
+        .email-status.invalid { display: block; color: var(--error); }
+
+        .auth-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 8px;
+        }
+
+        .auth-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(108, 99, 255, 0.4);
+        }
+
+        .auth-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .auth-divider {
+            display: flex;
+            align-items: center;
+            margin: 24px 0;
+        }
+
+        .auth-divider::before,
+        .auth-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--glass-border);
+        }
+
+        .auth-divider span {
+            padding: 0 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .fingerprint-btn {
+            width: 100%;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .fingerprint-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--primary);
+        }
+
+        .fingerprint-btn i {
+            font-size: 20px;
+            color: var(--primary-light);
+        }
+
+        .auth-footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .auth-footer a {
+            color: var(--primary-light);
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: var(--error);
+            display: none;
+        }
+
+        .error-message.show {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .success-message {
+            background: rgba(0, 212, 170, 0.1);
+            border: 1px solid rgba(0, 212, 170, 0.3);
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: var(--success);
+            display: none;
+        }
+
+        .success-message.show {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .loading-spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .remember-forgot {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .remember-me {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .remember-me input {
+            accent-color: var(--primary);
+        }
+
+        .forgot-link {
+            font-size: 13px;
+            color: var(--primary-light);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .forgot-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Guest link */
+        .guest-link {
+            text-align: center;
+            margin-top: 16px;
+        }
+
+        .guest-link a {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .guest-link a:hover {
+            color: var(--primary-light);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <div class="auth-logo-icon">
+                    <i class="fa-solid fa-microphone-lines"></i>
+                </div>
+                <span class="auth-logo-text">AuraScribe</span>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <div id="loginForm">
+                <h1 class="auth-title">Welcome Back</h1>
+                <p class="auth-subtitle">Sign in to continue transcribing</p>
+
+                <div class="error-message" id="loginError">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span id="loginErrorText"></span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <div class="form-input-wrapper">
+                        <i class="fa-solid fa-envelope form-icon"></i>
+                        <input type="email" class="form-input" id="loginEmail" placeholder="you@example.com">
+                    </div>
+                    <div class="email-status" id="loginEmailStatus"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="form-input-wrapper">
+                        <i class="fa-solid fa-lock form-icon"></i>
+                        <input type="password" class="form-input" id="loginPassword" placeholder="Enter your password">
+                        <button type="button" class="password-toggle" onclick="togglePassword('loginPassword', this)">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="remember-forgot">
+                    <label class="remember-me">
+                        <input type="checkbox" id="rememberMe">
+                        Remember me
+                    </label>
+                    <a class="forgot-link" onclick="showForgotPassword()">Forgot password?</a>
+                </div>
+
+                <button class="auth-btn" id="loginBtn" onclick="handleLogin()">
+                    <span id="loginBtnText">Sign In</span>
+                    <div class="loading-spinner" id="loginSpinner"></div>
+                </button>
+
+                <div class="auth-divider">
+                    <span>or continue with</span>
+                </div>
+
+                <button class="fingerprint-btn" onclick="handleFingerprintLogin()">
+                    <i class="fa-solid fa-fingerprint"></i>
+                    Sign in with Fingerprint
+                </button>
+
+                <div class="auth-footer">
+                    Don't have an account? <a onclick="showSignup()">Sign Up</a>
+                </div>
+
+                <div class="guest-link">
+                    <a href="index.html">Continue as Guest →</a>
+                </div>
+            </div>
+
+            <!-- SIGNUP FORM -->
+            <div id="signupForm" style="display: none;">
+                <h1 class="auth-title">Create Account</h1>
+                <p class="auth-subtitle">Start your transcription journey</p>
+
+                <div class="error-message" id="signupError">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span id="signupErrorText"></span>
+                </div>
+
+                <div class="success-message" id="signupSuccess">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span id="signupSuccessText"></span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <div class="form-input-wrapper">
+                        <i class="fa-solid fa-user form-icon"></i>
+                        <input type="text" class="form-input" id="signupName" placeholder="John Doe">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <div class="form-input-wrapper">
+                        <i class="fa-solid fa-envelope form-icon"></i>
+                        <input type="email" class="form-input" id="signupEmail" placeholder="you@example.com">
+                    </div>
+                    <div class="email-status" id="signupEmailStatus"></div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="form-input-wrapper">
+                        <i class="fa-solid fa-lock form-icon"></i>
+                        <input type="password" class="form-input" id="signupPassword" placeholder="Create a strong password">
+                        <button type="button" class="password-toggle" onclick="togglePassword('signupPassword', this)">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="password-strength">
+                        <div class="password-strength-bar" id="passwordStrengthBar"></div>
+                    </div>
+                    <div class="password-requirements">
+                        <span id="req-length">• At least 8 characters</span>
+                        <span id="req-upper">• One uppercase letter</span>
+                        <span id="req-number">• One number</span>
+                        <span id="req-special">• One special character</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Confirm Password</label>
+                    <div class="form-input-wrapper">
+                        <i class="fa-solid fa-lock form-icon"></i>
+                        <input type="password" class="form-input" id="signupConfirmPassword" placeholder="Confirm your password">
+                        <button type="button" class="password-toggle" onclick="togglePassword('signupConfirmPassword', this)">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button class="auth-btn" id="signupBtn" onclick="handleSignup()">
+                    <span id="signupBtnText">Create Account</span>
+                    <div class="loading-spinner" id="signupSpinner"></div>
+                </button>
+
+                <div class="auth-divider">
+                    <span>or continue with</span>
+                </div>
+
+                <button class="fingerprint-btn" onclick="handleFingerprintSignup()">
+                    <i class="fa-solid fa-fingerprint"></i>
+                    Sign up with Fingerprint
+                </button>
+
+                <div class="auth-footer">
+                    Already have an account? <a onclick="showLogin()">Sign In</a>
+                </div>
+
+                <div class="guest-link">
+                    <a href="index.html">Continue as Guest →</a>
+                </div>
+            </div>
+
+            <!-- FORGOT PASSWORD FORM -->
+            <div id="forgotForm" style="display: none;">
+                <h1 class="auth-title">Reset Password</h1>
+                <p class="auth-subtitle">Enter your email to reset password</p>
+
+                <div class="error-message" id="forgotError">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    <span id="forgotErrorText"></span>
+                </div>
+
+                <div class="success-message" id="forgotSuccess">
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span id="forgotSuccessText"></span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <div class="form-input-wrapper">
+                        <i class="fa-solid fa-envelope form-icon"></i>
+                        <input type="email" class="form-input" id="forgotEmail" placeholder="you@example.com">
+                    </div>
+                </div>
+
+                <button class="auth-btn" onclick="handleForgotPassword()">
+                    Send Reset Link
+                </button>
+
+                <div class="auth-footer">
+                    <a onclick="showLogin()">← Back to Sign In</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== UTILITY FUNCTIONS ====================
+        
+        function togglePassword(inputId, btn) {
+            const input = document.getElementById(inputId);
+            const icon = btn.querySelector('i');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        function showError(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.querySelector('span').textContent = message;
+            el.classList.add('show');
+        }
+
+        function hideError(elementId) {
+            document.getElementById(elementId).classList.remove('show');
+        }
+
+        function showSuccess(elementId, message) {
+            const el = document.getElementById(elementId);
+            el.querySelector('span').textContent = message;
+            el.classList.add('show');
+        }
+
+        function hideSuccess(elementId) {
+            document.getElementById(elementId).classList.remove('show');
+        }
+
+        // ==================== FORM SWITCHING ====================
+        
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('signupForm').style.display = 'none';
+            document.getElementById('forgotForm').style.display = 'none';
+            hideError('loginError');
+            hideError('signupError');
+            hideSuccess('signupSuccess');
+        }
+
+        function showSignup() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('signupForm').style.display = 'block';
+            document.getElementById('forgotForm').style.display = 'none';
+            hideError('signupError');
+            hideError('loginError');
+        }
+
+        function showForgotPassword() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('signupForm').style.display = 'none';
+            document.getElementById('forgotForm').style.display = 'block';
+            hideError('forgotError');
+            hideSuccess('forgotSuccess');
+        }
+
+        // ==================== EMAIL VALIDATION ====================
+        
+        document.getElementById('signupEmail').addEventListener('input', function(e) {
+            const email = e.target.value;
+            const status = document.getElementById('signupEmailStatus');
+            
+            if (email === '') {
+                status.textContent = '';
+                status.className = 'email-status';
+                return;
+            }
+            
+            if (validateEmail(email)) {
+                // Check if email exists in localStorage
+                const users = JSON.parse(localStorage.getItem('auraScribeUsers') || '[]');
+                const exists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
+                
+                if (exists) {
+                    status.textContent = '✓ Email already registered - Sign in instead';
+                    status.className = 'email-status valid';
+                } else {
+                    status.textContent = '✓ Valid email address';
+                    status.className = 'email-status valid';
+                }
+            } else {
+                status.textContent = '✗ Please enter a valid email';
+                status.className = 'email-status invalid';
+            }
+        });
+
+        document.getElementById('loginEmail').addEventListener('input', function(e) {
+            const email = e.target.value;
+            const status = document.getElementById('loginEmailStatus');
+            
+            if (email === '') {
+                status.textContent = '';
+                status.className = 'email-status';
+                return;
+            }
+            
+            if (validateEmail(email)) {
+                status.textContent = '✓ Valid email format';
+                status.className = 'email-status valid';
+            } else {
+                status.textContent = '✗ Please enter a valid email';
+                status.className = 'email-status invalid';
+            }
+        });
+
+        // ==================== PASSWORD STRENGTH ====================
+        
+        document.getElementById('signupPassword').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const bar = document.getElementById('passwordStrengthBar');
+            
+            let strength = 0;
+            const hasLength = password.length >= 8;
+            const hasUpper = /[A-Z]/.test(password);
+            const hasNumber = /[0-9]/.test(password);
+            const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+            
+            document.getElementById('req-length').className = hasLength ? 'valid' : '';
+            document.getElementById('req-upper').className = hasUpper ? 'valid' : '';
+            document.getElementById('req-number').className = hasNumber ? 'valid' : '';
+            document.getElementById('req-special').className = hasSpecial ? 'valid' : '';
+            
+            if (hasLength) strength++;
+            if (hasUpper) strength++;
+            if (hasNumber) strength++;
+            if (hasSpecial) strength++;
+            
+            bar.className = 'password-strength-bar';
+            if (strength <= 1) bar.classList.add('weak');
+            else if (strength <= 2) bar.classList.add('medium');
+            else bar.classList.add('strong');
+        });
+
+        // ==================== USER STORAGE ====================
+        
+        function getUsers() {
+            return JSON.parse(localStorage.getItem('auraScribeUsers') || '[]');
+        }
+
+        function saveUsers(users) {
+            localStorage.setItem('auraScribeUsers', JSON.stringify(users));
+        }
+
+        function hashPassword(password) {
+            // Simple hash for demo - in production use bcrypt on server
+            let hash = 0;
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return 'hashed_' + Math.abs(hash).toString(36) + '_' + password.length;
+        }
+
+        function setCurrentUser(user) {
+            localStorage.setItem('auraScribeCurrentUser', JSON.stringify(user));
+        }
+
+        function getCurrentUser() {
+            return JSON.parse(localStorage.getItem('auraScribeCurrentUser'));
+        }
+
+        // ==================== LOGIN HANDLER ====================
+        
+        async function handleLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            
+            hideError('loginError');
+            
+            if (!email || !password) {
+                showError('loginError', 'Please fill in all fields');
+                return;
+            }
+            
+            if (!validateEmail(email)) {
+                showError('loginError', 'Please enter a valid email address');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loginBtnText').style.display = 'none';
+            document.getElementById('loginSpinner').style.display = 'block';
+            document.getElementById('loginBtn').disabled = true;
+            
+            // Simulate API call
+            await new Promise(r => setTimeout(r, 1000));
+            
+            const users = getUsers();
+            const user = users.find(u => 
+                u.email.toLowerCase() === email.toLowerCase() && 
+                u.password === hashPassword(password)
+            );
+            
+            if (user) {
+                setCurrentUser(user);
+                
+                if (document.getElementById('rememberMe').checked) {
+                    localStorage.setItem('auraScribeRemember', email);
+                }
+                
+                window.location.href = 'index.html';
+            } else {
+                showError('loginError', 'Invalid email or password');
+                document.getElementById('loginBtnText').style.display = 'inline';
+                document.getElementById('loginSpinner').style.display = 'none';
+                document.getElementById('loginBtn').disabled = false;
+            }
+        }
+
+        // ==================== SIGNUP HANDLER ====================
+        
+        async function handleSignup() {
+            const name = document.getElementById('signupName').value.trim();
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('signupConfirmPassword').value;
+            
+            hideError('signupError');
+            hideSuccess('signupSuccess');
+            
+            if (!name || !email || !password || !confirmPassword) {
+                showError('signupError', 'Please fill in all fields');
+                return;
+            }
+            
+            if (!validateEmail(email)) {
+                showError('signupError', 'Please enter a valid email address');
+                return;
+            }
+            
+            if (password.length < 8) {
+                showError('signupError', 'Password must be at least 8 characters');
+                return;
+            }
+            
+            if (!/[A-Z]/.test(password)) {
+                showError('signupError', 'Password must contain at least one uppercase letter');
+                return;
+            }
+            
+            if (!/[0-9]/.test(password)) {
+                showError('signupError', 'Password must contain at least one number');
+                return;
+            }
+            
+            if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                showError('signupError', 'Password must contain at least one special character');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showError('signupError', 'Passwords do not match');
+                return;
+            }
+            
+            const users = getUsers();
+            if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+                showError('signupError', 'Email already registered. Please sign in.');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('signupBtnText').style.display = 'none';
+            document.getElementById('signupSpinner').style.display = 'block';
+            document.getElementById('signupBtn').disabled = true;
+            
+            // Simulate API call
+            await new Promise(r => setTimeout(r, 1500));
+            
+            const newUser = {
+                id: Date.now().toString(),
+                name: name,
+                email: email,
+                password: hashPassword(password),
+                createdAt: new Date().toISOString(),
+                fingerprintId: null
+            };
+            
+            users.push(newUser);
+            saveUsers(users);
+            
+            showSuccess('signupSuccess', 'Account created successfully! Redirecting...');
+            
+            setTimeout(() => {
+                setCurrentUser(newUser);
+                window.location.href = 'index.html';
+            }, 1500);
+        }
+
+        // ==================== FORGOT PASSWORD ====================
+        
+        async function handleForgotPassword() {
+            const email = document.getElementById('forgotEmail').value.trim();
+            
+            hideError('forgotError');
+            hideSuccess('forgotSuccess');
+            
+            if (!email || !validateEmail(email)) {
+                showError('forgotError', 'Please enter a valid email address');
+                return;
+            }
+            
+            const users = getUsers();
+            const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+            
+            if (user) {
+                // Generate new password
+                const newPassword = 'New' + Math.random().toString(36).slice(-8) + '1!';
+                user.password = hashPassword(newPassword);
+                saveUsers(users);
+                
+                showSuccess('forgotSuccess', `New password generated: ${newPassword} (Save this!)`);
+            } else {
+                showError('forgotError', 'No account found with this email');
+            }
+        }
+
+        // ==================== FINGERPRINT AUTH ====================
+        
+        async function handleFingerprintLogin() {
+            if (!window.PublicKeyCredential) {
+                showError('loginError', 'Fingerprint authentication is not supported in this browser');
+                return;
+            }
+            
+            try {
+                // Check if fingerprint credential exists
+                const credentialId = localStorage.getItem('auraScribeFingerprint');
+                
+                if (!credentialId) {
+                    showError('loginError', 'No fingerprint registered. Please sign up first.');
+                    return;
+                }
+                
+                // Simulate fingerprint verification
+                const users = getUsers();
+                const user = users.find(u => u.fingerprintId === credentialId);
+                
+                if (user) {
+                    setCurrentUser(user);
+                    window.location.href = 'index.html';
+                } else {
+                    showError('loginError', 'Fingerprint not recognized');
+                }
+            } catch (error) {
+                showError('loginError', 'Fingerprint authentication failed');
+            }
+        }
+
+        async function handleFingerprintSignup() {
+            if (!window.PublicKeyCredential) {
+                showError('signupError', 'Fingerprint authentication is not supported in this browser');
+                return;
+            }
+            
+            const name = document.getElementById('signupName').value.trim();
+            const email = document.getElementById('signupEmail').value.trim();
+            
+            if (!name || !email || !validateEmail(email)) {
+                showError('signupError', 'Please fill in name and valid email first');
+                return;
+            }
+            
+            try {
+                // Create fingerprint credential
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge: new Uint8Array(32),
+                        rp: { name: "AuraScribe Pro" },
+                        user: {
+                            id: new Uint8Array(16),
+                            name: email,
+                            displayName: name
+                        },
+                        pubKeyCredParams: [
+                            { alg: -7, type: "public-key" },
+                            { alg: -257, type: "public-key" }
+                        ],
+                        authenticatorSelection: {
+                            authenticatorAttachment: "platform",
+                            userVerification: "required"
+                        },
+                        timeout: 60000
+                    }
+                });
+                
+                // Store credential ID
+                const credentialId = Array.from(new Uint8Array(credential.rawId))
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+                
+                localStorage.setItem('auraScribeFingerprint', credentialId);
+                
+                // Auto-fill signup form
+                showSuccess('signupSuccess', 'Fingerprint registered! Complete the form to finish signup.');
+                
+            } catch (error) {
+                if (error.name === 'NotAllowedError') {
+                    showError('signupError', 'Fingerprint scan was cancelled');
+                } else {
+                    showError('signupError', 'Fingerprint registration failed: ' + error.message);
+                }
+            }
+        }
+
+        // ==================== INIT ====================
+        
+        window.onload = function() {
+            // Check for remembered email
+            const remembered = localStorage.getItem('auraScribeRemember');
+            if (remembered) {
+                document.getElementById('loginEmail').value = remembered;
+                document.getElementById('rememberMe').checked = true;
+            }
+            
+            // Check if already logged in
+            const currentUser = getCurrentUser();
+            if (currentUser) {
+                window.location.href = 'index.html';
+            }
+        };
+
+        // Enter key handlers
+        document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleLogin();
+        });
+        
+        document.getElementById('signupConfirmPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleSignup();
+        });
+    </script>
+</body>
+</html>

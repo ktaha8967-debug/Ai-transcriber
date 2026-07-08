@@ -1354,3 +1354,29 @@ function stopPoolStatusRefresh() {
         appState.poolRefreshInterval = null;
     }
 }
+
+// ==================== USER AUTHENTICATION ====================
+
+function checkUserLogin() {
+    const currentUser = JSON.parse(localStorage.getItem('auraScribeCurrentUser'));
+    const userInfo = document.getElementById('user-info');
+    const guestInfo = document.getElementById('guest-info');
+    
+    if (currentUser) {
+        userInfo.style.display = 'block';
+        guestInfo.style.display = 'none';
+        document.getElementById('user-name').textContent = currentUser.name;
+        document.getElementById('user-email').textContent = currentUser.email;
+    } else {
+        userInfo.style.display = 'none';
+        guestInfo.style.display = 'block';
+    }
+}
+
+function logout() {
+    localStorage.removeItem('auraScribeCurrentUser');
+    checkUserLogin();
+}
+
+// Check login on page load
+checkUserLogin();

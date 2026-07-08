@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraScribe Pro - AI Voice Transcriber</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --primary-light: #8B83FF;
+            --secondary: #FF6B9D;
+            --accent: #00D4AA;
+            --accent-alt: #FFB347;
+            --bg-gradient-1: #1A1A2E;
+            --bg-gradient-2: #16213E;
+            --bg-gradient-3: #0F3460;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #FFFFFF;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --neu-shadow: 8px 8px 16px rgba(0, 0, 0, 0.3), -8px -8px 16px rgba(255, 255, 255, 0.05);
+            --neu-shadow-lg: 12px 12px 24px rgba(0, 0, 0, 0.4), -12px -12px 24px rgba(255, 255, 255, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-1) 0%, var(--bg-gradient-2) 50%, var(--bg-gradient-3) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* Animated background particles */
+        .bg-particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .particle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+            opacity: 0.3;
+            animation: float 15s infinite ease-in-out;
+        }
+
+        .particle:nth-child(1) { left: 10%; animation-delay: 0s; background: var(--primary); }
+        .particle:nth-child(2) { left: 20%; animation-delay: 2s; background: var(--secondary); }
+        .particle:nth-child(3) { left: 30%; animation-delay: 4s; background: var(--accent); }
+        .particle:nth-child(4) { left: 40%; animation-delay: 6s; background: var(--accent-alt); }
+        .particle:nth-child(5) { left: 50%; animation-delay: 8s; background: var(--primary-light); }
+        .particle:nth-child(6) { left: 60%; animation-delay: 10s; background: var(--secondary); }
+        .particle:nth-child(7) { left: 70%; animation-delay: 12s; background: var(--accent); }
+        .particle:nth-child(8) { left: 80%; animation-delay: 14s; background: var(--primary); }
+        .particle:nth-child(9) { left: 90%; animation-delay: 1s; background: var(--accent-alt); }
+        .particle:nth-child(10) { left: 15%; animation-delay: 3s; background: var(--primary-light); }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.3; }
+            90% { opacity: 0.3; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Glassmorphism Card */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            box-shadow: var(--neu-shadow);
+        }
+
+        /* Neomorphism Button */
+        .neu-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border: none;
+            border-radius: 16px;
+            padding: 18px 40px;
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            cursor: pointer;
+            box-shadow: var(--neu-shadow-lg), 0 0 30px rgba(108, 99, 255, 0.4);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .neu-btn:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: var(--neu-shadow-lg), 0 0 50px rgba(108, 99, 255, 0.6);
+        }
+
+        .neu-btn:active {
+            transform: translateY(2px) scale(0.98);
+        }
+
+        .neu-btn-secondary {
+            background: linear-gradient(135deg, var(--secondary) 0%, #FF85A1 100%);
+            box-shadow: var(--neu-shadow), 0 0 30px rgba(255, 107, 157, 0.4);
+        }
+
+        .neu-btn-secondary:hover {
+            box-shadow: var(--neu-shadow-lg), 0 0 50px rgba(255, 107, 157, 0.6);
+        }
+
+        .neu-btn-accent {
+            background: linear-gradient(135deg, var(--accent) 0%, #00E6B8 100%);
+            box-shadow: var(--neu-shadow), 0 0 30px rgba(0, 212, 170, 0.4);
+        }
+
+        /* Header */
+        .header {
+            padding: 24px 48px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(108, 99, 255, 0.4);
+        }
+
+        .logo-text {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary-light);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 60px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .hero-content {
+            flex: 1;
+            max-width: 600px;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            padding: 8px 20px;
+            font-size: 14px;
+            color: var(--accent);
+            margin-bottom: 24px;
+        }
+
+        .hero-badge i {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .hero-title {
+            font-size: 56px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 24px;
+        }
+
+        .hero-title span {
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--secondary) 50%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-description {
+            font-size: 18px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            margin-bottom: 40px;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .hero-visual {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+
+        .phone-mockup {
+            width: 300px;
+            height: 600px;
+            background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%);
+            border-radius: 40px;
+            border: 2px solid var(--glass-border);
+            box-shadow: var(--neu-shadow-lg), 0 0 60px rgba(108, 99, 255, 0.2);
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .phone-mockup::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 24px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, #1A1A2E 0%, #16213E 100%);
+            border-radius: 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 40px 20px;
+        }
+
+        .phone-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            box-shadow: 0 8px 24px rgba(108, 99, 255, 0.4);
+        }
+
+        .phone-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .phone-wave {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .phone-wave span {
+            width: 4px;
+            background: var(--accent);
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+
+        .phone-wave span:nth-child(1) { height: 20px; animation-delay: 0s; }
+        .phone-wave span:nth-child(2) { height: 35px; animation-delay: 0.1s; }
+        .phone-wave span:nth-child(3) { height: 50px; animation-delay: 0.2s; }
+        .phone-wave span:nth-child(4) { height: 35px; animation-delay: 0.3s; }
+        .phone-wave span:nth-child(5) { height: 20px; animation-delay: 0.4s; }
+
+        @keyframes wave {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(1.5); }
+        }
+
+        /* Features Section */
+        .features {
+            padding: 100px 48px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-title {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .section-title span {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+        }
+
+        .feature-card {
+            padding: 40px 32px;
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
+            transform: scaleX(0);
+            transition: transform 0.4s ease;
+        }
+
+        .feature-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--neu-shadow-lg);
+        }
+
+        .feature-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 24px;
+        }
+
+        .feature-icon.purple { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%); box-shadow: 0 8px 24px rgba(108, 99, 255, 0.3); }
+        .feature-icon.pink { background: linear-gradient(135deg, var(--secondary) 0%, #FF85A1 100%); box-shadow: 0 8px 24px rgba(255, 107, 157, 0.3); }
+        .feature-icon.green { background: linear-gradient(135deg, var(--accent) 0%, #00E6B8 100%); box-shadow: 0 8px 24px rgba(0, 212, 170, 0.3); }
+        .feature-icon.orange { background: linear-gradient(135deg, var(--accent-alt) 0%, #FFC876 100%); box-shadow: 0 8px 24px rgba(255, 179, 71, 0.3); }
+
+        .feature-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .feature-description {
+            font-size: 15px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Models Section */
+        .models-section {
+            padding: 100px 48px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .model-card {
+            padding: 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .model-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .model-name {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .model-type {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .model-type.vosk { background: rgba(0, 212, 170, 0.2); color: var(--accent); }
+        .model-type.whisper { background: rgba(108, 99, 255, 0.2); color: var(--primary-light); }
+        .model-type.nova { background: rgba(255, 107, 157, 0.2); color: var(--secondary); }
+
+        /* Download Section */
+        .download-section {
+            padding: 100px 48px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .download-card {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 60px 48px;
+            background: linear-gradient(145deg, rgba(108, 99, 255, 0.15) 0%, rgba(255, 107, 157, 0.1) 100%);
+            border: 1px solid var(--glass-border);
+        }
+
+        .download-title {
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .download-subtitle {
+            font-size: 18px;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+        }
+
+        .download-btn {
+            font-size: 20px;
+            padding: 20px 50px;
+        }
+
+        .download-info {
+            margin-top: 24px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .download-info i {
+            color: var(--accent);
+            margin-right: 6px;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 40px 48px;
+            text-align: center;
+            border-top: 1px solid var(--glass-border);
+            position: relative;
+            z-index: 10;
+        }
+
+        .footer-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .footer-text a {
+            color: var(--primary-light);
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .hero {
+                flex-direction: column;
+                padding: 40px 24px;
+            }
+
+            .hero-title {
+                font-size: 36px;
+            }
+
+            .phone-mockup {
+                width: 240px;
+                height: 480px;
+            }
+
+            .header {
+                padding: 20px 24px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .features, .models-section, .download-section {
+                padding: 60px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background Particles -->
+    <div class="bg-particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">
+                <i class="fa-solid fa-microphone-lines"></i>
+            </div>
+            <span class="logo-text">AuraScribe Pro</span>
+        </div>
+        <nav class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#models">AI Models</a>
+            <a href="#download">Download</a>
+            <a href="http://ai-transcriber.britsync.co.uk" target="_blank">Launch App</a>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">
+                <i class="fa-solid fa-bolt"></i>
+                Powered by 12 AI Models
+            </div>
+            <h1 class="hero-title">
+                Transform Voice Into<br>
+                <span>Instant Transcription</span>
+            </h1>
+            <p class="hero-description">
+                AuraScribe Pro uses advanced AI models including Nova Dynamics, Vosk, and Whisper 
+                to deliver lightning-fast, accurate voice transcription. Works offline with 
+                automatic model distribution for maximum speed.
+            </p>
+            <div class="hero-buttons">
+                <a href="app-debug.apk" download class="neu-btn download-btn">
+                    <i class="fa-solid fa-download"></i>
+                    Download App
+                </a>
+                <a href="http://ai-transcriber.britsync.co.uk" target="_blank" class="neu-btn neu-btn-secondary">
+                    <i class="fa-solid fa-play"></i>
+                    Try Live Demo
+                </a>
+            </div>
+        </div>
+        <div class="hero-visual">
+            <div class="phone-mockup glass-card">
+                <div class="phone-screen">
+                    <div class="phone-icon">
+                        <i class="fa-solid fa-microphone"></i>
+                    </div>
+                    <div class="phone-wave">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <p class="phone-text">Listening...</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-header">
+            <h2 class="section-title">Why <span>AuraScribe Pro</span>?</h2>
+            <p class="section-subtitle">Professional-grade transcription powered by cutting-edge AI</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card glass-card">
+                <div class="feature-icon purple">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <h3 class="feature-title">3-Second Batches</h3>
+                <p class="feature-description">
+                    Real-time transcription with 3-second audio batches. 
+                    See results as you speak with minimal latency.
+                </p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon pink">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <h3 class="feature-title">12 AI Models</h3>
+                <p class="feature-description">
+                    Nova Dynamics GPU, 8 Vosk models, and 3 Whisper models 
+                    working together with automatic load balancing.
+                </p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon green">
+                    <i class="fa-solid fa-wifi-slash"></i>
+                </div>
+                <h3 class="feature-title">Works Offline</h3>
+                <p class="feature-description">
+                    Full functionality without internet. Models run locally 
+                    on your device for complete privacy.
+                </p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon orange">
+                    <i class="fa-solid fa-file-export"></i>
+                </div>
+                <h3 class="feature-title">Export Anywhere</h3>
+                <p class="feature-description">
+                    Export to Word, PDF, or plain text. Auto-generate 
+                    summaries with AI-powered key point extraction.
+                </p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon purple">
+                    <i class="fa-solid fa-language"></i>
+                </div>
+                <h3 class="feature-title">Multi-Language</h3>
+                <p class="feature-description">
+                    Support for English, Hindi, Urdu, Spanish, French, 
+                    German, Chinese, Arabic, and more.
+                </p>
+            </div>
+            <div class="feature-card glass-card">
+                <div class="feature-icon green">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h3 class="feature-title">100% Secure</h3>
+                <p class="feature-description">
+                    All processing happens locally. Your audio never leaves 
+                    your device. Complete privacy guaranteed.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Models Section -->
+    <section class="models-section" id="models">
+        <div class="section-header">
+            <h2 class="section-title">Powered by <span>12 AI Models</span></h2>
+            <p class="section-subtitle">Automatic distribution across models for maximum speed</p>
+        </div>
+        <div class="models-grid">
+            <div class="model-card glass-card">
+                <div class="model-name">Nova Dynamics</div>
+                <span class="model-type nova">GPU Accelerated</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk English</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk Hindi</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk Spanish</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk French</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk German</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk Chinese</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk Arabic</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Vosk Portuguese</div>
+                <span class="model-type vosk">Fast Local</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Whisper Tiny</div>
+                <span class="model-type whisper">High Accuracy</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Whisper Base</div>
+                <span class="model-type whisper">High Accuracy</span>
+            </div>
+            <div class="model-card glass-card">
+                <div class="model-name">Whisper Small</div>
+                <span class="model-type whisper">High Accuracy</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section class="download-section" id="download">
+        <div class="download-card glass-card">
+            <h2 class="download-title">Download <span style="background: linear-gradient(135deg, var(--primary-light), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">AuraScribe Pro</span></h2>
+            <p class="download-subtitle">Get the app and start transcribing in seconds</p>
+            <a href="app-debug.apk" download class="neu-btn download-btn">
+                <i class="fa-solid fa-download"></i>
+                Download the App Now
+            </a>
+            <div class="download-info">
+                <p><i class="fa-solid fa-check-circle"></i> Free forever</p>
+                <p><i class="fa-solid fa-check-circle"></i> No ads, no tracking</p>
+                <p><i class="fa-solid fa-check-circle"></i> Works offline</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p class="footer-text">
+            Made with <i class="fa-solid fa-heart" style="color: var(--secondary);"></i> by AuraScribe Team |
+            <a href="http://ai-transcriber.britsync.co.uk" target="_blank">Launch Web App</a>
+        </p>
+    </footer>
+</body>
+</html>

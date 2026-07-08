@@ -283,15 +283,26 @@ function stopTimer() {
 // RECORDING CONTROLS
 // ============================================================================
 
+let audioContext = null;
+let analyserNode = null;
+let micStream = null;
+
 async function startRecording() {
     try {
         resizeCanvas();
         
-        // Start audio recorder for visualization
-        appState.recorder = new WavRecorder();
-        await appState.recorder.start((analyser) => {
-            appState.analyserNode = analyser;
-        });
+        // Start audio for visualization using Web Audio API
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(micStream);
+            analyserNode = audioContext.createAnalyser();
+            analyserNode.fftSize = 256;
+            source.connect(analyserNode);
+            appState.analyserNode = analyserNode;
+        } catch (e) {
+            console.warn('Microphone access denied for visualization:', e);
+        }
 
         // Set session ID
         const now = new Date();
@@ -325,7 +336,10 @@ async function startRecording() {
         const speechLang = langMap[languageSelect.value] || 'en-US';
         
         if (!startSpeechRecognition(speechLang)) {
-            console.warn('Web Speech API not available, using fallback');
+            console.warn('Web Speech API not available');
+            statusLabel.textContent = "Speech recognition not supported in this browser";
+            statusLabel.style.color = "var(--color-red)";
+            return;
         }
 
         // UI updates
@@ -364,7 +378,6 @@ function togglePause() {
     if (!appState.isRecording) return;
     
     if (appState.isPaused) {
-        appState.recorder.resume();
         appState.isPaused = false;
         pauseBtn.innerHTML = '<i class="fa-solid fa-pause"></i> <span>Pause</span>';
         
@@ -376,7 +389,6 @@ function togglePause() {
         statusDot.className = "status-indicator-dot active";
         statusDot.style.backgroundColor = "var(--color-green)";
     } else {
-        appState.recorder.pause();
         appState.isPaused = true;
         pauseBtn.innerHTML = '<i class="fa-solid fa-play"></i> <span>Resume</span>';
         
@@ -395,14 +407,23 @@ async function stopRecording() {
     // Stop speech recognition
     stopSpeechRecognition();
     
+    // Stop audio stream
+    if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+        micStream = null;
+    }
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+    }
+    
     // Stop timers and visuals
     stopTimer();
     cancelAnimationFrame(appState.animationFrameId);
     
-    // Stop recorder
-    appState.recorder.stop();
     appState.isRecording = false;
     appState.isPaused = false;
+    appState.analyserNode = null;
     
     // Reset UI
     recordBtn.classList.remove('recording');

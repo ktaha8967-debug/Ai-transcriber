@@ -22,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Voice Transcriber & Summarizer")
 
-# API Keys (stored locally, not in git)
-GEMINI_API_KEY = "AQ.Ab8RN6Ii4AZPGDHQ_UbXkslH_jN8eZORfmJb7SWtq-TNl5kl4w"
-GROQ_API_KEY = ""  # Add your Groq key here for summarization
+# API Keys - Load from environment variables
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 # Session structure
 class SaveRequest(BaseModel):

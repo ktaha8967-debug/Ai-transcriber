@@ -5,10 +5,12 @@ import logging
 import threading
 import base64
 import json
+import wave
+import io
 from typing import List, Optional, Any
 from datetime import datetime
 import httpx
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
@@ -272,8 +274,124 @@ if not os.path.exists(STATIC_DIR):
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Loading Whisper models (fallback)...")
+    logger.info("Loading Whisper models...")
     threading.Thread(target=load_whisper_models, daemon=True).start()
+
+# ============================================================================
+# WEBSOCKET REAL-TIME TRANSCRIPTION (Google Voice Typing Style)
+# ============================================================================
+
+@app.websocket("/ws/transcribe")
+async def websocket_transcribe(websocket: WebSocket):
+    """
+    Real-time transcription via WebSocket.
+    Client sends audio chunks, server returns transcription instantly.
+    Like Google Voice Typing - instant results as you speak!
+    """
+    await websocket.accept()
+    logger.info("WebSocket client connected for real-time transcription")
+    
+    # Audio buffer to accumulate chunks
+    audio_buffer = bytearray()
+    chunk_count = 0
+    
+    try:
+        while True:
+            # Receive audio data from client
+            data = await websocket.receive_bytes()
+            chunk_count += 1
+            
+            # Add to buffer
+            audio_buffer.extend(data)
+            
+            # Process every ~1 second of audio (16000 samples * 2 bytes = 32000 bytes)
+            buffer_size = len(audio_buffer)
+            if buffer_size >= 32000:  # ~1 second of 16kHz 16-bit mono audio
+                # Convert buffer to WAV file
+                wav_data = create_wav_from_pcm(bytes(audio_buffer), 16000)
+                
+                # Save to temp file
+                temp_path = f"temp/ws_{uuid.uuid4()}.wav"
+                os.makedirs("temp", exist_ok=True)
+                with open(temp_path, "wb") as f:
+                    f.write(wav_data)
+                
+                # Transcribe with fastest available model
+                try:
+                    text = transcribe_quick(temp_path)
+                    if text.strip():
+                        # Send result back immediately
+                        await websocket.send_json({
+                            "type": "transcription",
+                            "text": text,
+                            "is_final": False,
+                            "chunk": chunk_count
+                        })
+                        logger.info(f"WS Transcription: {text[:50]}...")
+                except Exception as e:
+                    logger.warning(f"WS transcription error: {e}")
+                finally:
+                    # Clean up temp file
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                
+                # Keep last 0.5 seconds for context overlap
+                overlap_size = 8000  # 0.5 seconds
+                audio_buffer = audio_buffer[-overlap_size:] if buffer_size > overlap_size else bytearray()
+    
+    except WebSocketDisconnect:
+        logger.info("WebSocket client disconnected")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+
+def create_wav_from_pcm(pcm_data: bytes, sample_rate: int = 16000) -> bytes:
+    """Convert PCM audio data to WAV format."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, 'wb') as wav_file:
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+        wav_file.writeframes(pcm_data)
+    return buffer.getvalue()
+
+def transcribe_quick(file_path: str) -> str:
+    """Quick transcription with fastest available model."""
+    # Try Gemini first
+    if GEMINI_API_KEY:
+        try:
+            return transcribe_via_gemini_quick(file_path)
+        except:
+            pass
+    
+    # Fallback to Whisper
+    model_size = get_next_whisper()
+    if model_size and model_size in whisper_models:
+        model = whisper_models[model_size]
+        segments, _ = model.transcribe(file_path, beam_size=1, vad_filter=True, task="translate")
+        return " ".join([seg.text for seg in segments])
+    
+    return ""
+
+def transcribe_via_gemini_quick(file_path: str) -> str:
+    """Quick Gemini transcription."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    with open(file_path, "rb") as f:
+        audio_data = base64.b64encode(f.read()).decode("utf-8")
+    
+    payload = {
+        "contents": [{"parts": [
+            {"inlineData": {"mimeType": "audio/wav", "data": audio_data}},
+            {"text": "Transcribe this audio. Return only the transcribed text, nothing else."}
+        ]}],
+        "generationConfig": {"responseMimeType": "text/plain"}
+    }
+    
+    with httpx.Client(timeout=15.0) as client:
+        response = client.post(url, json=payload)
+        if response.status_code == 200:
+            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    return ""
 
 @app.get("/")
 async def root():

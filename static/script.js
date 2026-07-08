@@ -252,10 +252,12 @@ const appState = {
     poolRefreshInterval: null,
     secondsElapsed: 0,
     currentSessionId: null,
-    transcribedSegments: [], // Array of {timestamp, text, start, end}
+    transcribedSegments: [],
     analyserNode: null,
     animationFrameId: null,
-    detectedLanguage: null // Locked language for the current recording session
+    detectedLanguage: null,
+    websocket: null,
+    liveText: ''
 };
 
 let allSessionsList = []; // Global cache for sessions history list
@@ -402,6 +404,72 @@ function stopTimer() {
     appState.timerInterval = null;
 }
 
+// ============================================================================
+// WEBSOCKET REAL-TIME TRANSCRIPTION
+// ============================================================================
+
+function connectWebSocket() {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/transcribe`;
+    
+    appState.websocket = new WebSocket(wsUrl);
+    
+    appState.websocket.onopen = () => {
+        console.log('WebSocket connected for real-time transcription');
+        statusLabel.textContent = "Live transcription active";
+        statusLabel.style.color = "var(--color-green)";
+    };
+    
+    appState.websocket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'transcription' && data.text) {
+            // Append new text to live transcription
+            appState.liveText += ' ' + data.text;
+            
+            // Update live transcription display
+            updateLiveTranscription(data.text);
+        }
+    };
+    
+    appState.websocket.onclose = () => {
+        console.log('WebSocket disconnected');
+    };
+    
+    appState.websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+}
+
+function disconnectWebSocket() {
+    if (appState.websocket) {
+        appState.websocket.close();
+        appState.websocket = null;
+    }
+}
+
+function updateLiveTranscription(newText) {
+    // Find or create live transcription element
+    let liveEl = document.getElementById('live-transcription');
+    if (!liveEl) {
+        liveEl = document.createElement('div');
+        liveEl.id = 'live-transcription';
+        liveEl.style.cssText = 'padding: 12px; background: rgba(37, 99, 235, 0.1); border-radius: 8px; margin-bottom: 12px; border-left: 3px solid #2563EB;';
+        transcriptionBody.insertBefore(liveEl, transcriptionBody.firstChild);
+    }
+    
+    // Show live text with typing indicator
+    liveEl.innerHTML = `
+        <div style="font-size: 11px; color: #2563EB; margin-bottom: 4px; font-weight: 600;">
+            <i class="fa-solid fa-circle" style="animation: pulse 1s infinite; margin-right: 4px;"></i>
+            Live Transcription
+        </div>
+        <div style="font-size: 14px; color: var(--text-primary);">${appState.liveText}</div>
+    `;
+    
+    // Auto-scroll
+    transcriptionBody.scrollTop = transcriptionBody.scrollHeight;
+}
+
 // Start Recording Event
 async function startRecording() {
     try {
@@ -424,6 +492,10 @@ async function startRecording() {
         appState.isPaused = false;
         appState.transcribedSegments = [];
         appState.detectedLanguage = null;
+        appState.liveText = '';
+        
+        // Connect WebSocket for real-time transcription
+        connectWebSocket();
         
         // UI updates
         recordBtn.classList.add('recording');
@@ -437,10 +509,10 @@ async function startRecording() {
         languageSelect.disabled = true;
         
         // Update Live Status Text & Dot Indicator to Recording state (Red)
-        statusLabel.textContent = "Recording voice locally...";
-        statusLabel.style.color = "var(--color-red)";
+        statusLabel.textContent = "Live transcription active";
+        statusLabel.style.color = "var(--color-green)";
         statusDot.className = "status-indicator-dot active";
-        statusDot.style.backgroundColor = "var(--color-red)";
+        statusDot.style.backgroundColor = "var(--color-green)";
         
         // Set document details
         transcriptionBody.innerHTML = `
@@ -530,10 +602,13 @@ function togglePause() {
 async function stopRecording() {
     if (!appState.isRecording) return;
     
-    statusLabel.textContent = "Finalizing transcription & generating summary...";
+    statusLabel.textContent = "Finalizing transcription...";
     statusLabel.style.color = "var(--accent-blue)";
     statusDot.className = "status-indicator-dot";
     statusDot.style.backgroundColor = "var(--accent-blue)";
+    
+    // Disconnect WebSocket
+    disconnectWebSocket();
     
     // Stop timers, intervals, visuals
     stopTimer();
@@ -555,6 +630,21 @@ async function stopRecording() {
     
     drawFlatLine();
     
+    // Save live transcription if we have text
+    if (appState.liveText.trim()) {
+        // Add live text as final segment
+        const now = new Date();
+        const timestamp = `00:00 - ${formatTime(appState.secondsElapsed)}`;
+        appState.transcribedSegments.push({
+            timestamp: timestamp,
+            text: appState.liveText.trim(),
+            start: 0,
+            end: appState.secondsElapsed
+        });
+        renderTranscription(appState.transcribedSegments);
+    }
+    
+    // Process final chunk
     if (finalWavChunk && finalWavChunk.blob) {
         await uploadAndTranscribeChunk(finalWavChunk.blob, finalWavChunk.startTime, true);
     } else {

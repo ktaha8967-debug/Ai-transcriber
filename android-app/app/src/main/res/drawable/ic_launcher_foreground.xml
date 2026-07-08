@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Microphone icon for AuraScribe -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28c-4.4,0 -8,3.6 -8,8v16c0,4.4 3.6,8 8,8s8,-3.6 8,-8V36C62,31.6 58.4,28 54,28z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M68,52c0,7.7 -6.3,14 -14,14s-14,-6.3 -14,-14h-4c0,9.4 7.1,17.2 16,18.7V78h8v-7.3c8.9,-1.5 16,-9.3 16,-18.7H68z"/>
+</vector>

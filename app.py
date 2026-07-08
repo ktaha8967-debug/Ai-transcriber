@@ -426,21 +426,35 @@ def transcribe_via_groq(file_path: str, api_key: str, language: str = "auto"):
     url = "https://api.groq.com/openai/v1/audio/transcriptions"
     headers = {"Authorization": f"Bearer {api_key}"}
     
-    files = {"file": (os.path.basename(file_path), open(file_path, "rb"), "audio/wav")}
+    # Read file for sending
+    with open(file_path, "rb") as f:
+        file_data = f.read()
+    
+    files = {"file": (os.path.basename(file_path), file_data, "audio/wav")}
     data = {"model": "whisper-large-v3-turbo", "response_format": "verbose_json"}
     
     if language and language != "auto":
         data["language"] = language
     
+    logger.info(f"Groq request: file={os.path.basename(file_path)}, size={len(file_data)} bytes")
+    
     try:
         with httpx.Client(timeout=30.0) as client:
             response = client.post(url, headers=headers, files=files, data=data)
+            
+            logger.info(f"Groq response: status={response.status_code}")
+            
             if response.status_code != 200:
-                raise Exception(f"Groq API error: {response.status_code} - {response.text}")
+                error_msg = f"Groq API error {response.status_code}: {response.text[:200]}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
             
             resp_data = response.json()
             segments = resp_data.get("segments", [])
             detected_language = resp_data.get("language", "auto")
+            full_text = resp_data.get("text", "")
+            
+            logger.info(f"Groq result: text='{full_text[:100]}', segments={len(segments)}, lang={detected_language}")
             
             parsed_segments = []
             for seg in segments:
@@ -457,9 +471,12 @@ def transcribe_via_groq(file_path: str, api_key: str, language: str = "auto"):
             detected_language_code = lang_mapping.get(detected_language.lower(), detected_language)
             
             return parsed_segments, detected_language_code
-    finally:
-        if "file" in files:
-            files["file"][1].close()
+    except httpx.TimeoutException:
+        logger.error("Groq API timeout")
+        raise
+    except Exception as e:
+        logger.error(f"Groq API exception: {e}")
+        raise
 
 def transcribe_via_gemini(file_path: str, api_key: str):
     """Translates audio file using Google Gemini API."""
@@ -564,17 +581,20 @@ async def transcribe_audio(
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        logger.info(f"Saved temporary file to {temp_file_path}")
+        file_size = os.path.getsize(temp_file_path)
+        logger.info(f"Saved audio file: {temp_file_path} (Size: {file_size} bytes)")
         
         # PRIORITY 1: Groq Cloud API (FASTEST & MOST RELIABLE)
         if groq_api_key:
             try:
-                logger.info("Trying Groq Cloud API (PRIMARY)...")
+                logger.info("Calling Groq API...")
                 segments, detected_language = transcribe_via_groq(temp_file_path, groq_api_key, language)
                 model_used = "groq-cloud"
-                logger.info("Groq transcription successful!")
+                logger.info(f"Groq SUCCESS! Segments: {len(segments)}, Language: {detected_language}")
+                for seg in segments[:3]:  # Log first 3 segments
+                    logger.info(f"  [{seg['start']:.1f}s-{seg['end']:.1f}s] {seg['text'][:50]}")
             except Exception as e:
-                logger.warning(f"Groq failed: {e}")
+                logger.error(f"Groq FAILED: {e}")
         
         # PRIORITY 2: Nova Dynamics GPU (if Groq failed)
         if segments is None:

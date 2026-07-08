@@ -462,17 +462,17 @@ async function startRecording() {
         visualize();
         startPoolStatusRefresh();
         
-        // Set Continuous Autosave Interval (every 3 seconds for faster transcription)
+        // Set Continuous Live Transcription (every 1 second for instant results)
         if (continuousAutosave.checked) {
             appState.autosaveInterval = setInterval(() => {
                 if (!appState.isPaused) {
                     processAudioChunk(false);
                 }
-            }, 3000);
+            }, 1000);  // 1 second interval for instant transcription
         }
         
         autosaveIndicator.style.visibility = "visible";
-        autosaveIndicator.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-blue-600"></i> <span>Autosave engine monitoring...</span>';
+        autosaveIndicator.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-blue-600"></i> <span>Live transcription active...</span>';
         
     } catch (err) {
         console.error("Failed to access microphone or initialize AudioContext:", err);
@@ -588,6 +588,11 @@ async function uploadAndTranscribeChunk(audioBlob, startTime, isFinal = false) {
     formData.append("file", audioBlob, "audio.wav");
     formData.append("language", appState.detectedLanguage || languageSelect.value);
 
+    // Show processing status
+    if (!isFinal) {
+        autosaveIndicator.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin text-blue-600"></i> <span>Transcribing...</span>';
+    }
+
     try {
         const response = await fetch("/api/transcribe", {
             method: "POST",
@@ -626,14 +631,19 @@ async function uploadAndTranscribeChunk(audioBlob, startTime, isFinal = false) {
             };
         });
         
-        // Append segments to state
+        // Append segments to state (don't replace - keeps all transcription)
         appState.transcribedSegments = appState.transcribedSegments.concat(adjustedSegments);
         
-        // Update UI Transcription Panel
+        // Update UI immediately
         renderTranscription(appState.transcribedSegments);
         
-        // Trigger background autosave
-        if (appState.transcribedSegments.length > 0) {
+        // Show success status
+        if (!isFinal && adjustedSegments.length > 0) {
+            autosaveIndicator.innerHTML = '<i class="fa-solid fa-circle-check text-green-600"></i> <span>Live transcription active</span>';
+        }
+        
+        // Only save on final stop
+        if (appState.transcribedSegments.length > 0 && isFinal) {
             await saveSession(isFinal);
         } else {
             if (isFinal) {

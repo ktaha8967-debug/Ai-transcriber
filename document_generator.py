@@ -32,11 +32,12 @@ def get_unicode_font():
 
 FONT_NAME = get_unicode_font()
 
-def save_to_docx(session_id, full_text_segments, summary_points=None):
+def save_to_docx(session_id, full_text_segments, summary_points=None, output_dir=None):
     """
     Saves/Updates the Word document with the full transcription.
     """
-    file_path = os.path.join(OUTPUT_DIR, f"{session_id}.docx")
+    save_dir = output_dir or OUTPUT_DIR
+    file_path = os.path.join(save_dir, f"{session_id}.docx")
     
     doc = docx.Document()
     
@@ -75,11 +76,12 @@ def save_to_docx(session_id, full_text_segments, summary_points=None):
     doc.save(file_path)
     return file_path
 
-def save_to_pdf(session_id, summary_points, full_text_preview=""):
+def save_to_pdf(session_id, summary_points, full_text_preview="", output_dir=None):
     """
     Saves the summary and key points in a PDF document.
     """
-    file_path = os.path.join(OUTPUT_DIR, f"{session_id}_summary.pdf")
+    save_dir = output_dir or OUTPUT_DIR
+    file_path = os.path.join(save_dir, f"{session_id}_summary.pdf")
     
     doc = SimpleDocTemplate(
         file_path,

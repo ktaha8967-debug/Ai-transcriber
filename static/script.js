@@ -747,6 +747,10 @@ async function saveEditedSegment(index, newText) {
 // Save active session data to Backend
 async function saveSession(isFinal = false) {
     try {
+        // Get current user ID
+        const currentUser = JSON.parse(localStorage.getItem('auraScribeCurrentUser'));
+        const userId = currentUser ? currentUser.id : 'guest';
+        
         const response = await fetch("/api/save", {
             method: "POST",
             headers: {
@@ -755,7 +759,8 @@ async function saveSession(isFinal = false) {
             body: JSON.stringify({
                 session_id: appState.currentSessionId,
                 text_segments: appState.transcribedSegments,
-                language: languageSelect.value
+                language: languageSelect.value,
+                user_id: userId
             })
         });
         
@@ -884,10 +889,10 @@ function renderSummary(points) {
     previewDiv.innerHTML = `
         <h4 class="summary-preview-heading">Session Exports</h4>
         <div class="session-downloads-row">
-            <a href="/api/download/docx/${appState.currentSessionId}" class="download-link-btn" id="open-word-link">
+            <a href="/api/download/docx/${appState.currentSessionId}/${getCurrentUserId()}" class="download-link-btn" id="open-word-link">
                 <i class="fa-regular fa-file-word text-blue-600"></i> Open Word
             </a>
-            <a href="/api/download/pdf/${appState.currentSessionId}" class="download-link-btn" id="open-pdf-link">
+            <a href="/api/download/pdf/${appState.currentSessionId}/${getCurrentUserId()}" class="download-link-btn" id="open-pdf-link">
                 <i class="fa-regular fa-file-pdf text-red-600"></i> Open PDF Summary
             </a>
         </div>
@@ -898,7 +903,11 @@ function renderSummary(points) {
 // Fetch session list from Backend
 async function loadSessionHistory() {
     try {
-        const response = await fetch("/api/sessions");
+        // Get current user ID
+        const currentUser = JSON.parse(localStorage.getItem('auraScribeCurrentUser'));
+        const userId = currentUser ? currentUser.id : 'guest';
+        
+        const response = await fetch(`/api/sessions/${userId}`);
         const data = await response.json();
         
         if (!data.success) {
@@ -951,7 +960,7 @@ function renderSessions(sessions) {
         docxLink.title = "Download Word file";
         docxLink.onclick = (e) => {
             e.stopPropagation();
-            window.location.href = `/api/download/docx/${session.session_id}`;
+            window.location.href = `/api/download/docx/${session.session_id}/${getCurrentUserId()}`;
         };
         actions.appendChild(docxLink);
         
@@ -962,7 +971,7 @@ function renderSessions(sessions) {
             pdfLink.title = "Download PDF Summary";
             pdfLink.onclick = (e) => {
                 e.stopPropagation();
-                window.location.href = `/api/download/pdf/${session.session_id}`;
+                window.location.href = `/api/download/pdf/${session.session_id}/${getCurrentUserId()}`;
             };
             actions.appendChild(pdfLink);
         }
@@ -1023,7 +1032,7 @@ async function loadHistoricalSession(sessionId) {
     `;
     
     try {
-        const docxResponse = await fetch(`/api/download/docx/${sessionId}`);
+        const docxResponse = await fetch(`/api/download/docx/${sessionId}/${getCurrentUserId()}`);
         if (!docxResponse.ok) {
             throw new Error("Could not find session documents on disk.");
         }
@@ -1150,7 +1159,7 @@ document.addEventListener('click', () => {
 // Export triggers
 document.getElementById('export-docx').onclick = () => {
     if (appState.currentSessionId) {
-        window.location.href = `/api/download/docx/${appState.currentSessionId}`;
+        window.location.href = `/api/download/docx/${appState.currentSessionId}/${getCurrentUserId()}`;
     } else {
         alert("No active session to export!");
     }
@@ -1158,7 +1167,7 @@ document.getElementById('export-docx').onclick = () => {
 
 document.getElementById('export-pdf').onclick = () => {
     if (appState.currentSessionId) {
-        window.location.href = `/api/download/pdf/${appState.currentSessionId}`;
+        window.location.href = `/api/download/pdf/${appState.currentSessionId}/${getCurrentUserId()}`;
     } else {
         alert("No active session to export!");
     }
@@ -1262,13 +1271,13 @@ copyTextBtn.onclick = () => {
 
 downloadDocxBtn.onclick = () => {
     if (appState.currentSessionId) {
-        window.location.href = `/api/download/docx/${appState.currentSessionId}`;
+        window.location.href = `/api/download/docx/${appState.currentSessionId}/${getCurrentUserId()}`;
     }
 };
 
 downloadPdfBtn.onclick = () => {
     if (appState.currentSessionId) {
-        window.location.href = `/api/download/pdf/${appState.currentSessionId}`;
+        window.location.href = `/api/download/pdf/${appState.currentSessionId}/${getCurrentUserId()}`;
     }
 };
 
@@ -1356,6 +1365,11 @@ function stopPoolStatusRefresh() {
 }
 
 // ==================== USER AUTHENTICATION ====================
+
+function getCurrentUserId() {
+    const currentUser = JSON.parse(localStorage.getItem('auraScribeCurrentUser'));
+    return currentUser ? currentUser.id : 'guest';
+}
 
 function checkUserLogin() {
     const currentUser = JSON.parse(localStorage.getItem('auraScribeCurrentUser'));

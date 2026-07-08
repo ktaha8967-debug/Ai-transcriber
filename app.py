@@ -25,12 +25,14 @@ app = FastAPI(title="Voice Transcriber & Summarizer")
 # API Keys - Load from environment variables
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+KIMI_API_KEY = os.environ.get("KIMI_API_KEY", "sk-tnd06L94SmoXBdHFmJJl6WxLTYVAIv8QlsQ3Aum2QT7Tb9Tg")
 
 # Session structure
 class SaveRequest(BaseModel):
     session_id: str
     text_segments: List[Any]
     language: Optional[str] = "en"
+    user_id: Optional[str] = "guest"
 
 # ============================================================================
 # GEMINI 2.5 TRANSCRIPTION (PRIMARY)
@@ -93,6 +95,51 @@ Return ONLY the JSON array, nothing else."""
     except Exception as e:
         logger.warning(f"Gemini failed: {e}")
         raise
+
+# ============================================================================
+# KIMI TRANSCRIPTION (SECONDARY)
+# ============================================================================
+
+def transcribe_via_kimi(file_path: str, language: str = "auto"):
+    """
+    Transcribes audio using Kimi K2.6 (Moonshot AI).
+    SECONDARY model - used when Gemini fails.
+    """
+    url = "https://api.moonshot.ai/v1/audio/transcriptions"
+    headers = {"Authorization": f"Bearer {KIMI_API_KEY}"}
+    
+    files = {"file": (os.path.basename(file_path), open(file_path, "rb"), "audio/wav")}
+    data = {"model": "whisper-1", "response_format": "verbose_json"}
+    
+    if language and language != "auto":
+        data["language"] = language
+    
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            response = client.post(url, headers=headers, files=files, data=data)
+            
+            if response.status_code != 200:
+                raise Exception(f"Kimi error {response.status_code}: {response.text[:200]}")
+            
+            resp_data = response.json()
+            segments = resp_data.get("segments", [])
+            detected_language = resp_data.get("language", "auto")
+            
+            parsed_segments = []
+            for seg in segments:
+                parsed_segments.append({
+                    "start": seg.get("start", 0.0),
+                    "end": seg.get("end", 0.0),
+                    "text": seg.get("text", "")
+                })
+            
+            return parsed_segments, detected_language
+    except Exception as e:
+        logger.warning(f"Kimi failed: {e}")
+        raise
+    finally:
+        if "file" in files:
+            files["file"][1].close()
 
 # ============================================================================
 # WHISPER MODELS (FALLBACK)
@@ -246,7 +293,14 @@ async def download_apk():
 @app.get("/api/pool-status")
 async def get_pool_status():
     whisper_loaded = list(whisper_models.keys())
-    return {"success": True, "status": {"whisper": whisper_loaded, "gemini": "ready"}}
+    return {
+        "success": True, 
+        "status": {
+            "whisper": whisper_loaded, 
+            "gemini": "ready" if GEMINI_API_KEY else "no key",
+            "kimi": "ready" if KIMI_API_KEY else "no key"
+        }
+    }
 
 @app.post("/api/transcribe")
 async def transcribe_audio(
@@ -272,15 +326,26 @@ async def transcribe_audio(
         model_used = "unknown"
         
         # PRIORITY 1: Gemini 2.5 Flash (FREE & FAST)
-        try:
-            logger.info("Trying Gemini 2.5 Flash...")
-            segments, detected_language = transcribe_via_gemini(temp_file_path, language)
-            model_used = "gemini-2.5-flash"
-            logger.info(f"Gemini SUCCESS! Segments: {len(segments)}")
-        except Exception as e:
-            logger.warning(f"Gemini failed: {e}")
+        if GEMINI_API_KEY:
+            try:
+                logger.info("Trying Gemini 2.5 Flash...")
+                segments, detected_language = transcribe_via_gemini(temp_file_path, language)
+                model_used = "gemini-2.5-flash"
+                logger.info(f"Gemini SUCCESS! Segments: {len(segments)}")
+            except Exception as e:
+                logger.warning(f"Gemini failed: {e}")
         
-        # PRIORITY 2: Whisper (if Gemini failed)
+        # PRIORITY 2: Kimi K2.6 (if Gemini failed)
+        if segments is None and KIMI_API_KEY:
+            try:
+                logger.info("Trying Kimi K2.6...")
+                segments, detected_language = transcribe_via_kimi(temp_file_path, language)
+                model_used = "kimi-k2.6"
+                logger.info(f"Kimi SUCCESS! Segments: {len(segments)}")
+            except Exception as e:
+                logger.warning(f"Kimi failed: {e}")
+        
+        # PRIORITY 3: Whisper (if all cloud APIs failed)
         if segments is None and whisper_models:
             model_size = get_next_whisper()
             if model_size:
@@ -335,6 +400,12 @@ async def save_transcription(request: SaveRequest):
     try:
         session_id = request.session_id
         text_segments = request.text_segments
+        user_id = request.user_id or "guest"
+        
+        # Create user-specific directory
+        user_dir = os.path.join(TRANSCRIPTION_DIR, user_id)
+        if not os.path.exists(user_dir):
+            os.makedirs(user_dir)
         
         full_text = " ".join([seg.get("text", "") if isinstance(seg, dict) else str(seg) for seg in text_segments])
         
@@ -345,10 +416,10 @@ async def save_transcription(request: SaveRequest):
         else:
             summary_points = ["Audio transcription was too short to generate a summary."]
             
-        docx_path = document_generator.save_to_docx(session_id, text_segments, summary_points)
-        pdf_path = document_generator.save_to_pdf(session_id, summary_points, full_text)
+        docx_path = document_generator.save_to_docx(session_id, text_segments, summary_points, user_dir)
+        pdf_path = document_generator.save_to_pdf(session_id, summary_points, full_text, user_dir)
         
-        draft_path = os.path.join(TRANSCRIPTION_DIR, f"{session_id}_draft.txt")
+        draft_path = os.path.join(user_dir, f"{session_id}_draft.txt")
         draft_lines = [f"[{seg.get('timestamp', '')}] {seg.get('text', '')}" for seg in text_segments if isinstance(seg, dict)]
         
         with open(draft_path, "w", encoding="utf-8") as f:
@@ -359,15 +430,20 @@ async def save_transcription(request: SaveRequest):
         logger.error(f"Save error: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
-@app.get("/api/sessions")
-async def get_sessions():
+@app.get("/api/sessions/{user_id}")
+async def get_sessions(user_id: str):
+    """Get sessions only for the logged-in user."""
     try:
-        files = os.listdir(TRANSCRIPTION_DIR)
+        user_dir = os.path.join(TRANSCRIPTION_DIR, user_id)
+        if not os.path.exists(user_dir):
+            return {"success": True, "sessions": []}
+        
+        files = os.listdir(user_dir)
         sessions = []
         for file in files:
             if file.endswith(".docx"):
                 session_id = file[:-5]
-                docx_path = os.path.join(TRANSCRIPTION_DIR, file)
+                docx_path = os.path.join(user_dir, file)
                 pdf_exists = f"{session_id}_summary.pdf" in files
                 mtime = os.path.getmtime(docx_path)
                 formatted_time = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
@@ -376,7 +452,7 @@ async def get_sessions():
                 draft_file = f"{session_id}_draft.txt"
                 if draft_file in files:
                     try:
-                        with open(os.path.join(TRANSCRIPTION_DIR, draft_file), "r", encoding="utf-8") as f:
+                        with open(os.path.join(user_dir, draft_file), "r", encoding="utf-8") as f:
                             preview = f.read(150) + "..."
                     except: pass
                 
@@ -387,8 +463,9 @@ async def get_sessions():
     except Exception as e:
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
 
-@app.get("/api/download/{file_type}/{session_id}")
-async def download_file(file_type: str, session_id: str):
+@app.get("/api/download/{file_type}/{session_id}/{user_id}")
+async def download_file(file_type: str, session_id: str, user_id: str):
+    """Download file only from user's directory."""
     if file_type == "docx":
         filename = f"{session_id}.docx"
         media_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -398,7 +475,9 @@ async def download_file(file_type: str, session_id: str):
     else:
         raise HTTPException(status_code=400, detail="Invalid file type.")
         
-    file_path = os.path.join(TRANSCRIPTION_DIR, filename)
+    user_dir = os.path.join(TRANSCRIPTION_DIR, user_id)
+    file_path = os.path.join(user_dir, filename)
+    
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail=f"File {filename} not found.")
         

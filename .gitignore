@@ -17,3 +17,10 @@ transcriptions/
 # IDE files
 .vscode/
 .idea/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.production
+error.txt
+*.txt

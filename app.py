@@ -44,7 +44,7 @@ def load_env():
             logger.warning(f"Failed to load .env file: {e}")
 
 load_env()
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
 KIMI_AVAILABLE = True
 
 # Nova Dynamics API Configuration
@@ -415,18 +415,24 @@ def warm_nova_api():
     threading.Thread(target=_warm, daemon=True).start()
 
 def transcribe_via_groq(file_path: str, api_key: str, language: str = "auto"):
-    """Translates audio file using Groq Whisper API."""
-    url = "https://api.groq.com/openai/v1/audio/translations"
+    """
+    Transcribes audio using Groq Whisper API (Cloud-based, fast & accurate).
+    Uses whisper-large-v3-turbo for best speed/accuracy balance.
+    """
+    url = "https://api.groq.com/openai/v1/audio/transcriptions"
     headers = {"Authorization": f"Bearer {api_key}"}
     
     files = {"file": (os.path.basename(file_path), open(file_path, "rb"), "audio/wav")}
     data = {"model": "whisper-large-v3-turbo", "response_format": "verbose_json"}
     
+    if language and language != "auto":
+        data["language"] = language
+    
     try:
-        with httpx.Client(timeout=60.0) as client:
+        with httpx.Client(timeout=30.0) as client:
             response = client.post(url, headers=headers, files=files, data=data)
             if response.status_code != 200:
-                raise Exception(f"Groq API error: {response.text}")
+                raise Exception(f"Groq API error: {response.status_code} - {response.text}")
             
             resp_data = response.json()
             segments = resp_data.get("segments", [])

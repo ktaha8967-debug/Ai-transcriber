@@ -50,6 +50,7 @@ KIMI_AVAILABLE = True
 # Nova Dynamics API Configuration
 NOVA_API_KEY = "sk-nova-998877"
 NOVA_API_URL = "https://britsyncuk--ollama-gpu-bench-run.modal.run/api/generate"
+nova_warm = False  # Track if Nova is warmed up
 
 app = FastAPI(title="Voice Transcriber & Summarizer")
 
@@ -312,9 +313,15 @@ def init_models_background():
 def transcribe_via_nova(file_path: str, language: str = "auto"):
     """
     Transcribes audio using Nova Dynamics GPU API (qwen2.5:32b).
-    This is the PRIMARY model - tried first before all others.
+    Quick timeout - if cold start takes too long, fallback to other models.
     """
+    global nova_warm
     import base64
+    
+    # Skip if Nova is known to be slow/cold and we have other options
+    if not nova_warm:
+        logger.info("Nova Dynamics not warmed up yet, skipping...")
+        raise Exception("Nova not warmed up")
     
     # Read audio file and encode to base64
     with open(file_path, "rb") as f:
@@ -327,18 +334,11 @@ def transcribe_via_nova(file_path: str, language: str = "auto"):
                     "fr": "French", "de": "German", "zh": "Chinese", "ar": "Arabic"}
         lang_instruction = f"Transcribe in {lang_map.get(language, language)}."
     
-    prompt = f"""You are a professional audio transcription AI. Transcribe the following audio accurately.
+    prompt = f"""Transcribe this audio. Return JSON array with segments: [{{"start": 0.0, "end": 3.0, "text": "transcription"}}]
 
 {lang_instruction}
 
-Return the transcription as a JSON array with segments. Each segment must have:
-- "start": float (start time in seconds)
-- "end": float (end time in seconds)  
-- "text": string (transcribed text)
-
-Return ONLY the JSON array, no other text.
-
-Audio data (base64): {audio_data[:1000]}..."""
+Audio: {audio_data[:500]}..."""
 
     headers = {
         "Content-Type": "application/json",
@@ -352,10 +352,11 @@ Audio data (base64): {audio_data[:1000]}..."""
     }
     
     try:
-        with httpx.Client(timeout=120.0) as client:
+        # QUICK TIMEOUT - 10 seconds max for Nova
+        with httpx.Client(timeout=10.0) as client:
             response = client.post(NOVA_API_URL, headers=headers, json=payload)
             if response.status_code != 200:
-                raise Exception(f"Nova Dynamics API error: {response.text}")
+                raise Exception(f"Nova API error: {response.status_code}")
             
             resp_data = response.json()
             ai_response = resp_data.get("response", "")
@@ -368,12 +369,40 @@ Audio data (base64): {audio_data[:1000]}..."""
                 if isinstance(segments, list) and len(segments) > 0:
                     return segments, language if language != "auto" else "en"
             
-            # If no JSON found, return the text as a single segment
             return [{"start": 0.0, "end": 3.0, "text": ai_response.strip()}], "en"
             
     except Exception as e:
-        logger.warning(f"Nova Dynamics API failed: {e}")
+        logger.warning(f"Nova Dynamics failed: {e}")
         raise
+
+def warm_nova_api():
+    """Warm up Nova Dynamics GPU in background on startup."""
+    global nova_warm
+    
+    def _warm():
+        global nova_warm
+        try:
+            logger.info("Warming up Nova Dynamics GPU...")
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {NOVA_API_KEY}"
+            }
+            payload = {
+                "model": "qwen2.5:32b",
+                "prompt": "Hello",
+                "stream": False
+            }
+            with httpx.Client(timeout=30.0) as client:
+                response = client.post(NOVA_API_URL, headers=headers, json=payload)
+                if response.status_code == 200:
+                    nova_warm = True
+                    logger.info("Nova Dynamics GPU is warm and ready!")
+                else:
+                    logger.warning(f"Nova warm-up failed: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Nova warm-up failed (will retry): {e}")
+    
+    threading.Thread(target=_warm, daemon=True).start()
 
 def transcribe_via_groq(file_path: str, api_key: str, language: str = "auto"):
     """Translates audio file using Groq Whisper API."""
@@ -468,11 +497,22 @@ async def startup_event():
     """Initialize all models in background on startup."""
     logger.info("Starting model pool initialization in background...")
     threading.Thread(target=init_models_background, daemon=True).start()
+    
+    # Warm up Nova Dynamics GPU in background
+    warm_nova_api()
 
 @app.get("/api/pool-status")
 async def get_pool_status():
     """Get current model pool status."""
-    return {"success": True, "status": model_pool.get_status()}
+    status = model_pool.get_status()
+    status["nova_warm"] = nova_warm
+    return {"success": True, "status": status}
+
+@app.post("/api/warm-nova")
+async def warm_nova_endpoint():
+    """Manually trigger Nova Dynamics warm-up."""
+    warm_nova_api()
+    return {"success": True, "message": "Nova warm-up triggered"}
 
 @app.post("/api/transcribe")
 async def transcribe_audio(

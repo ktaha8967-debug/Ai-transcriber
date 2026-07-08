@@ -249,6 +249,7 @@ const appState = {
     recorder: null,
     timerInterval: null,
     autosaveInterval: null,
+    poolRefreshInterval: null,
     secondsElapsed: 0,
     currentSessionId: null,
     transcribedSegments: [], // Array of {timestamp, text, start, end}
@@ -266,8 +267,8 @@ const stopBtn = document.getElementById('stop-btn');
 const timerEl = document.getElementById('recording-timer');
 const statusLabel = document.getElementById('status-label');
 const statusDot = document.getElementById('status-indicator-dot');
-const modelSelect = document.getElementById('model-select');
 const languageSelect = document.getElementById('language-select');
+const poolStatusEl = document.getElementById('pool-status');
 const continuousAutosave = document.getElementById('continuous-autosave');
 const transcriptionBody = document.getElementById('transcription-body');
 const summaryBody = document.getElementById('summary-body');
@@ -433,7 +434,6 @@ async function startRecording() {
         stopBtn.disabled = false;
         
         // Disable settings adjustments during recording
-        modelSelect.disabled = true;
         languageSelect.disabled = true;
         
         // Update Live Status Text & Dot Indicator to Recording state (Red)
@@ -460,14 +460,15 @@ async function startRecording() {
         // Start timers & visualization
         startTimer();
         visualize();
+        startPoolStatusRefresh();
         
-        // Set Continuous Autosave Interval (every 15 seconds)
+        // Set Continuous Autosave Interval (every 3 seconds for faster transcription)
         if (continuousAutosave.checked) {
             appState.autosaveInterval = setInterval(() => {
                 if (!appState.isPaused) {
                     processAudioChunk(false);
                 }
-            }, 15000);
+            }, 3000);
         }
         
         autosaveIndicator.style.visibility = "visible";
@@ -536,6 +537,7 @@ async function stopRecording() {
     
     // Stop timers, intervals, visuals
     stopTimer();
+    stopPoolStatusRefresh();
     clearInterval(appState.autosaveInterval);
     appState.autosaveInterval = null;
     cancelAnimationFrame(appState.animationFrameId);
@@ -562,7 +564,6 @@ async function stopRecording() {
             statusLabel.textContent = "Ready to record";
             statusLabel.style.color = "var(--text-secondary)";
             statusDot.style.backgroundColor = "var(--text-muted)";
-            modelSelect.disabled = false;
             languageSelect.disabled = false;
         }
     }
@@ -585,7 +586,6 @@ async function processAudioChunk(isQuietAutosave = false) {
 async function uploadAndTranscribeChunk(audioBlob, startTime, isFinal = false) {
     const formData = new FormData();
     formData.append("file", audioBlob, "audio.wav");
-    formData.append("model_size", modelSelect.value);
     formData.append("language", appState.detectedLanguage || languageSelect.value);
 
     try {
@@ -666,7 +666,6 @@ async function uploadAndTranscribeChunk(audioBlob, startTime, isFinal = false) {
             statusLabel.textContent = "Ready to record";
             statusLabel.style.color = "var(--text-secondary)";
             statusDot.style.backgroundColor = "var(--text-muted)";
-            modelSelect.disabled = false;
             languageSelect.disabled = false;
         }
     }
@@ -787,7 +786,6 @@ async function saveSession(isFinal = false) {
             statusDot.style.backgroundColor = "var(--color-green)";
             
             // Re-enable options
-            modelSelect.disabled = false;
             languageSelect.disabled = false;
             
             // Refresh history drawer
@@ -1292,4 +1290,67 @@ document.addEventListener('click', (e) => {
 // App Startup Code
 window.onload = () => {
     loadSessionHistory();
+    loadPoolStatus();
 };
+
+// Fetch and display model pool status
+async function loadPoolStatus() {
+    try {
+        const response = await fetch("/api/pool-status");
+        const data = await response.json();
+        
+        if (data.success && data.status) {
+            const status = data.status;
+            const modelCount = status.total_models;
+            
+            if (modelCount > 0) {
+                // Show loaded models count and list
+                const voskCount = status.models.filter(m => m.startsWith('vosk')).length;
+                const whisperCount = status.models.filter(m => m.startsWith('whisper')).length;
+                
+                poolStatusEl.innerHTML = `
+                    <div class="pool-ready">
+                        <i class="fa-solid fa-check-circle text-green-600"></i>
+                        <span><strong>${modelCount}</strong> Models Ready</span>
+                    </div>
+                    <div class="pool-breakdown">
+                        <span class="pool-tag vosk-tag"><i class="fa-solid fa-bolt"></i> ${voskCount} Vosk (Fast)</span>
+                        <span class="pool-tag whisper-tag"><i class="fa-solid fa-brain"></i> ${whisperCount} Whisper (Accurate)</span>
+                    </div>
+                `;
+            } else {
+                // Models still loading
+                poolStatusEl.innerHTML = `
+                    <div class="pool-loading">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <span>Loading models...</span>
+                    </div>
+                `;
+                // Retry in 3 seconds
+                setTimeout(loadPoolStatus, 3000);
+            }
+        }
+    } catch (err) {
+        console.error("Failed to load pool status:", err);
+        poolStatusEl.innerHTML = `
+            <div class="pool-error">
+                <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
+                <span>Checking status...</span>
+            </div>
+        `;
+        // Retry in 5 seconds
+        setTimeout(loadPoolStatus, 5000);
+    }
+}
+
+// Refresh pool status periodically during recording
+function startPoolStatusRefresh() {
+    appState.poolRefreshInterval = setInterval(loadPoolStatus, 10000);
+}
+
+function stopPoolStatusRefresh() {
+    if (appState.poolRefreshInterval) {
+        clearInterval(appState.poolRefreshInterval);
+        appState.poolRefreshInterval = null;
+    }
+}

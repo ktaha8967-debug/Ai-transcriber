@@ -61,7 +61,7 @@
             </div>
             
             <div class="sidebar-footer">
-                <div class="footer-info">Offline Transcriber v1.2</div>
+                <div class="footer-info">Offline Transcriber v1.3</div>
                 <div class="footer-path" title="D:\Voice transcriber">Saves locally to Workspace</div>
             </div>
         </aside>
@@ -129,21 +129,24 @@
 
                     <!-- Column 3: Engine Settings -->
                     <div class="dashboard-column settings-column">
-                        <h4 class="column-title"><i class="fa-solid fa-sliders"></i> Engine Configurations</h4>
+                        <h4 class="column-title"><i class="fa-solid fa-sliders"></i> Auto-Distribution Engine</h4>
                         
-                        <div class="setting-field">
-                            <div class="setting-label-row">
-                                <label for="model-select">Whisper Model</label>
-                                <span class="setting-helper-tip" title="Larger models are more accurate but consume more RAM.">Info</span>
+                        <div class="auto-dist-card">
+                            <div class="auto-dist-header">
+                                <i class="fa-solid fa-robot text-blue-600"></i>
+                                <span>Smart Model Pool</span>
                             </div>
-                            <select id="model-select" class="form-select">
-                                <option value="tiny">Tiny (Fastest, ~75MB)</option>
-                                <option value="base" selected>Base (Recommended, ~140MB)</option>
-                                <option value="small">Small (High Accuracy, ~460MB)</option>
-                                <option value="medium">Medium (Very High Accuracy, ~1.5GB)</option>
-                                <option value="large-v3">Large V3 (Maximum Accuracy, ~3GB)</option>
-                            </select>
-                            <p class="setting-help-text">Local translation and transcription model.</p>
+                            <div class="auto-dist-status" id="pool-status">
+                                <div class="pool-loading">
+                                    <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                    <span>Loading 11 models...</span>
+                                </div>
+                            </div>
+                            <div class="auto-dist-info">
+                                <p><i class="fa-solid fa-check-circle text-green-600"></i> Auto-distributes batches across models</p>
+                                <p><i class="fa-solid fa-check-circle text-green-600"></i> No manual selection needed</p>
+                                <p><i class="fa-solid fa-check-circle text-green-600"></i> 3-second batch processing</p>
+                            </div>
                         </div>
 
                         <div class="setting-field">
@@ -167,9 +170,9 @@
                         <div class="setting-field toggle-field">
                             <div class="toggle-control">
                                 <input type="checkbox" id="continuous-autosave" checked class="switch-input">
-                                <label for="continuous-autosave" class="switch-label">Continuous Autosave (15s)</label>
+                                <label for="continuous-autosave" class="switch-label">Continuous Autosave (3s)</label>
                             </div>
-                            <p class="setting-help-text">Saves document drafts to disk automatically.</p>
+                            <p class="setting-help-text">Saves document drafts every 3 seconds automatically.</p>
                         </div>
                     </div>
                 </div>

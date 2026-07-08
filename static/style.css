@@ -742,6 +742,104 @@ body {
     cursor: pointer;
 }
 
+/* Auto-Distribution Card */
+.auto-dist-card {
+    background: linear-gradient(135deg, var(--accent-blue-light) 0%, var(--color-purple-light) 100%);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+.auto-dist-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.auto-dist-status {
+    background: #FFFFFF;
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    margin-bottom: 10px;
+}
+
+.pool-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.pool-ready {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-green);
+    font-weight: 600;
+}
+
+.pool-breakdown {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.pool-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.vosk-tag {
+    background: var(--color-green-light);
+    color: var(--color-green);
+    border: 1px solid var(--color-green-border);
+}
+
+.whisper-tag {
+    background: var(--color-purple-light);
+    color: var(--color-purple);
+    border: 1px solid #DDD6FE;
+}
+
+.pool-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--color-amber);
+}
+
+.auto-dist-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.auto-dist-info p {
+    font-size: 10px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.auto-dist-info i {
+    font-size: 10px;
+}
+
 /* ==========================================
    Responsive Two-Column Results Section
    ========================================== */

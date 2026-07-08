@@ -1361,15 +1361,25 @@ function checkUserLogin() {
     const currentUser = JSON.parse(localStorage.getItem('auraScribeCurrentUser'));
     const userInfo = document.getElementById('user-info');
     const guestInfo = document.getElementById('guest-info');
+    const headerUserInfo = document.getElementById('header-user-info');
     
     if (currentUser) {
         userInfo.style.display = 'block';
         guestInfo.style.display = 'none';
         document.getElementById('user-name').textContent = currentUser.name;
         document.getElementById('user-email').textContent = currentUser.email;
+        
+        // Show header user info
+        if (headerUserInfo) {
+            headerUserInfo.style.display = 'flex';
+            document.getElementById('header-user-name').textContent = currentUser.name;
+        }
     } else {
         userInfo.style.display = 'none';
         guestInfo.style.display = 'block';
+        if (headerUserInfo) {
+            headerUserInfo.style.display = 'none';
+        }
     }
 }
 

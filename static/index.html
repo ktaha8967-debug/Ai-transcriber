@@ -93,6 +93,12 @@
                     <h1 class="header-title">Audio Transcription Workspace</h1>
                 </div>
                 <div class="header-right">
+                    <div id="header-user-info" style="display: none; margin-right: 12px; display: flex; align-items: center; gap: 8px;">
+                        <span id="header-user-name" style="font-size: 13px; font-weight: 500;"></span>
+                        <button onclick="logout()" style="padding: 6px 12px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; color: #EF4444; font-size: 12px; cursor: pointer;">
+                            <i class="fa-solid fa-right-from-bracket"></i> Logout
+                        </button>
+                    </div>
                     <div class="offline-badge">
                         <i class="fa-solid fa-shield-halved"></i>
                         <span>100% Offline Secured</span>

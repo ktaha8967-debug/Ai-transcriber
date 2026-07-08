@@ -364,7 +364,7 @@ Audio data (base64): {audio_data[:1000]}..."""
             import re
             json_match = re.search(r'\[.*\]', ai_response, re.DOTALL)
             if json_match:
-                segments = json.loads_module.loads(json_match.group())
+                segments = json_module.loads(json_match.group())
                 if isinstance(segments, list) and len(segments) > 0:
                     return segments, language if language != "auto" else "en"
             
@@ -709,6 +709,30 @@ async def download_file(file_type: str, session_id: str):
         raise HTTPException(status_code=404, detail=f"File {filename} not found.")
         
     return FileResponse(path=file_path, filename=filename, media_type=media_type)
+
+@app.get("/")
+async def root():
+    """Redirect root to landing page."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/landing.html")
+
+@app.get("/app")
+async def app_redirect():
+    """Redirect /app to main transcription workspace."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/index.html")
+
+@app.get("/download-apk")
+async def download_apk():
+    """Download the Android APK file."""
+    apk_path = os.path.join(os.path.dirname(__file__), "app-debug.apk")
+    if not os.path.exists(apk_path):
+        raise HTTPException(status_code=404, detail="APK file not found")
+    return FileResponse(
+        path=apk_path,
+        filename="AuraScribe-Pro.apk",
+        media_type="application/vnd.android.package-archive"
+    )
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 

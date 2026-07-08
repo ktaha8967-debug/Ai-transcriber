@@ -556,25 +556,27 @@ async def transcribe_audio(
             
         logger.info(f"Saved temporary file to {temp_file_path}")
         
-        # PRIORITY 1: Nova Dynamics GPU API (PRIMARY MODEL - tried first!)
-        try:
-            logger.info("Trying Nova Dynamics GPU API (PRIMARY)...")
-            segments, detected_language = transcribe_via_nova(temp_file_path, language)
-            model_used = "nova-dynamics-gpu"
-            logger.info("Nova Dynamics transcription successful!")
-        except Exception as e:
-            logger.warning(f"Nova Dynamics failed: {e}. Trying other models...")
-        
-        # PRIORITY 2: Try other cloud APIs if Nova failed
-        if segments is None and groq_api_key:
+        # PRIORITY 1: Groq Cloud API (FASTEST & MOST RELIABLE)
+        if groq_api_key:
             try:
-                logger.info("Trying Groq Cloud API...")
+                logger.info("Trying Groq Cloud API (PRIMARY)...")
                 segments, detected_language = transcribe_via_groq(temp_file_path, groq_api_key, language)
                 model_used = "groq-cloud"
                 logger.info("Groq transcription successful!")
             except Exception as e:
                 logger.warning(f"Groq failed: {e}")
-                
+        
+        # PRIORITY 2: Nova Dynamics GPU (if Groq failed)
+        if segments is None:
+            try:
+                logger.info("Trying Nova Dynamics GPU...")
+                segments, detected_language = transcribe_via_nova(temp_file_path, language)
+                model_used = "nova-dynamics-gpu"
+                logger.info("Nova Dynamics successful!")
+            except Exception as e:
+                logger.warning(f"Nova failed: {e}")
+        
+        # PRIORITY 3: Gemini API (if others failed)
         if segments is None and gemini_api_key:
             try:
                 logger.info("Trying Gemini Cloud API...")
@@ -584,18 +586,18 @@ async def transcribe_audio(
             except Exception as e:
                 logger.warning(f"Gemini failed: {e}")
         
-        # PRIORITY 2: Use Model Pool (automatic round-robin distribution)
+        # PRIORITY 4: Model Pool (Vosk + Whisper auto-distribution)
         if segments is None and model_pool.ready:
             try:
                 logger.info("Using Model Pool (auto-distribution)...")
                 segments, detected_language, model_used = model_pool.transcribe(temp_file_path, language)
-                logger.info(f"Model Pool transcription successful! Used: {model_used}")
+                logger.info(f"Model Pool successful! Used: {model_used}")
             except Exception as e:
                 logger.warning(f"Model Pool failed: {e}")
                 
-        # PRIORITY 3: Fallback to basic Whisper if pool not ready
+        # PRIORITY 5: Basic Whisper fallback (last resort)
         if segments is None:
-            logger.info("Fallback: Loading basic Whisper tiny model...")
+            logger.info("Fallback: Loading Whisper tiny model...")
             try:
                 model = WhisperModel("tiny", device="cpu", compute_type="int8")
                 transcribe_args = {"beam_size": 1, "vad_filter": True, "task": "translate"}
@@ -609,7 +611,11 @@ async def transcribe_audio(
                 model_used = "whisper-tiny-fallback"
             except Exception as e:
                 logger.error(f"All transcription methods failed: {e}")
-                raise Exception("No transcription model available")
+                # Return error instead of dummy data
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "error": "All transcription models failed. Please try again."}
+                )
         
         # Format segments
         result_segments = []

@@ -25,3 +25,13 @@ transcriptions/
 error.txt
 config.py
 *.txt
+
+# Build artifacts
+*.apk
+*.zip
+
+# Large model files
+vosk_models/
+
+# MiMoCode workspace
+.mimocode/
